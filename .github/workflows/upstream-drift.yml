@@ -1,0 +1,85 @@
+name: Upstream drift
+
+# 每周检查上游 DBX 契约是否变化；有变化就开/更新一个 issue，提醒同步 skill 文档。
+# 刻意不自动改基线：先更新文档，再运行 `npm run upstream:update` 重新基线化。
+
+on:
+  schedule:
+    # 每周一 02:00 UTC
+    - cron: "0 2 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: upstream-drift
+  cancel-in-progress: false
+
+jobs:
+  check:
+    name: 检查上游契约
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: 对比上游基线
+        id: drift
+        run: |
+          set -uo pipefail
+          node tools/upstream-drift.mjs --json > drift.json
+          status=$?
+          cat drift.json
+          if [ "$status" -eq 1 ]; then
+            echo "drifted=true" >> "$GITHUB_OUTPUT"
+          elif [ "$status" -eq 2 ]; then
+            echo "::warning::无法获取上游状态（网络或上游不可用），本次跳过"
+          else
+            echo "drifted=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: 生成 issue 正文
+        if: steps.drift.outputs.drifted == 'true'
+        run: node tools/upstream-drift.mjs --markdown > drift.md
+
+      - name: 上传检查结果
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: upstream-drift
+          path: |
+            drift.json
+            drift.md
+          if-no-files-found: ignore
+          retention-days: 30
+
+      - name: 创建或更新提醒 issue
+        if: steps.drift.outputs.drifted == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh label create upstream-drift \
+            --description "上游 DBX 契约发生变化，需要同步 skill" \
+            --color FBCA04 --force >/dev/null 2>&1 || true
+
+          TITLE="上游 DBX 契约发生变化，需要同步 skill 文档"
+          EXISTING=$(gh issue list --label upstream-drift --state open --limit 1 --json number --jq '.[0].number // empty')
+
+          if [ -n "$EXISTING" ]; then
+            echo "→ 更新已有 issue #$EXISTING"
+            {
+              echo "再次检测到漂移（$(date -u +%Y-%m-%d)）。"
+              echo ""
+              cat drift.md
+            } > comment.md
+            gh issue comment "$EXISTING" --body-file comment.md
+          else
+            echo "→ 创建新 issue"
+            gh issue create --title "$TITLE" --label upstream-drift --body-file drift.md
+          fi

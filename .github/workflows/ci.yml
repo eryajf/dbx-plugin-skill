@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: 测试 (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ["18", "20", "22"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: 环境信息
+        run: node --version && npm --version
+
+      - name: 端到端自检
+        run: npm test
+
+  package:
+    name: 打包校验
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: 校验 npm 打包内容
+        run: node tools/verify-package.mjs
+
+      - name: 构建 skill 压缩包
+        run: |
+          set -euo pipefail
+          VERSION=$(node -p "require('./package.json').version")
+          mkdir -p dist
+          (cd skill && zip -q -r "../dist/dbx-plugin-${VERSION}.zip" .)
+          ls -l dist
+
+      - name: 上传构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: skill-bundle
+          path: dist/*.zip
+          if-no-files-found: error
+          retention-days: 14

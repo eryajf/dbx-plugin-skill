@@ -1,0 +1,223 @@
+# dbx-plugin-skill
+
+一个用于 **DBX 插件开发** 的 agent skill（技能包），覆盖从创建到上架官方商店的全链路：
+
+**创建 → 开发 → 调试 → 打包 → 发布 Release → 提交 dbx-store 候选 PR → 审核签名**
+
+技能名：`dbx-plugin`（安装到 `~/.dsh/skills`、`~/.claude/skills`、`~/.agents/skills`）。
+
+---
+
+## 快速安装
+
+```bash
+# 方式一：直接安装（推荐）
+npx dbx-plugin-skill install
+
+# 方式二：全局安装后使用
+npm install --global dbx-plugin-skill
+dbx-plugin-skill install
+```
+
+安装后**重启 agent 会话**（技能目录在会话启动时扫描），然后即可通过自然语言触发，例如：
+
+> 帮我创建一个 DBX 插件，用 Svelte 模板，id 是 com.example.demo
+> 我的 DBX 插件打包报错 `manifest UI entry ... is not covered by [package].include`，帮我看下
+> 帮我把这个插件发布到 dbx-store，生成候选 JSON
+> 检查一下这个 .dbxp 包里有没有不该发布的东西
+
+### 安装选项
+
+```bash
+dbx-plugin-skill install [--target all|dsh,claude,agents] [--scope user|project] [--link] [--force]
+
+dbx-plugin-skill status     # 查看各目标安装状态
+dbx-plugin-skill doctor     # 环境自检（Node / dbx-plugin CLI / skill 安装 / 当前项目）
+dbx-plugin-skill path       # 打印安装路径
+dbx-plugin-skill uninstall  # 卸载（仅移除本安装器写入的内容）
+```
+
+| 选项 | 说明 |
+| --- | --- |
+| `--target` | 安装目标，默认 `all`：`dsh` = DeepSeek Harness，`claude` = Claude Code，`agents` = 共享 agents 目录 |
+| `--scope` | `user`（默认，家目录）或 `project`（当前目录下的 `.dsh/skills`、`.claude/skills`、`.agents/skills`） |
+| `--link` | 安装为符号链接，便于从源码仓库直接迭代（仅 user scope 下最有用） |
+| `--force` | 覆盖非本安装器写入的同名目录 |
+
+安装器会在目标目录写入 `.dbx-plugin-skill.json` 标记文件；卸载时据此判断归属，**不会误删手工安装的同名技能**。
+
+---
+
+## 前置依赖
+
+| 依赖 | 版本 | 用途 |
+| --- | --- | --- |
+| Node.js | ≥ 18（`dbx-plugin dev` 需 **≥ 22**） | 运行随附脚本与安装器 |
+| `@dbx-app/plugin-cli` | 建议最新 | 创建/调试/打包插件 |
+
+```bash
+npm install --global @dbx-app/plugin-cli
+dbx-plugin --help
+```
+
+> 检查版本：`dbx-plugin version`。若明显落后于 npm 上的最新版，建议 `npm install --global @dbx-app/plugin-cli@latest`。
+
+---
+
+## Skill 内容
+
+```
+skill/
+├── SKILL.md                          # 入口：心智模型、路由表、标准工作流、硬性约束
+├── references/
+│   ├── manifest.md                   # Manifest v1 字段、权限、入口、国际化、打包期重写
+│   ├── contributions.md              # 5 类贡献点、连接表单/binding、文件系统 RPC
+│   ├── host-api.md                   # window.dbxPlugin、context 规则、主题、CSP、资源
+│   ├── sidecar-protocol.md           # 协议 v1、JSONL/framed、Rust/Go SDK、错误码
+│   ├── cli.md                        # create / dev / package / keygen 全参数与环境变量
+│   ├── debugging.md                  # dev host、DBX_UI_BUILD_SUCCESS、诊断 API、能力边界
+│   ├── packaging.md                  # dbx-plugin.toml、打包流程、.dbxp 结构、体积限制
+│   ├── publishing.md                 # .dbx-store.json、候选 JSON、审核签名、校验规则
+│   └── troubleshooting.md            # 报错原文 → 原因 → 修法 对照表
+└── scripts/
+    ├── check-project.mjs             # 打包前预检
+    ├── inspect-dbxp.mjs              # 解包检查（含 ZIP 读取与 checksums 校验）
+    ├── make-candidate.mjs            # 生成候选与 release-candidates.json
+    └── dev-logs.mjs                  # 读取 dev host 脱敏日志
+```
+
+### 随附脚本
+
+四个脚本都是**零依赖**的 Node 程序（只用内置模块），可直接运行：
+
+```bash
+# 1) 打包前预检：manifest / dbx-plugin.toml / include 覆盖 / 资源存在 / 前后端一致 / 权限语法
+node skill/scripts/check-project.mjs [项目目录] [--json] [--quiet]
+
+# 2) 解包检查 .dbxp：条目、manifest、checksums 逐条校验、签名状态、bin target 一致性
+node skill/scripts/inspect-dbxp.mjs dist/my-plugin-0.1.0-universal.dbxp [--json] [--extract DIR] [--no-verify]
+
+# 3) 生成上架 JSON，并复核每个包的 sha256/size
+node skill/scripts/make-candidate.mjs [项目目录] [--repo owner/name] [--tag v1.0.0] [--release-notes "..."]
+
+# 4) 读取 dev host 日志（自动沿用 nextAfter + instanceId 游标）
+node skill/scripts/dev-logs.mjs --port 5190 [--level error] [--follow] [--json]
+```
+
+`check-project.mjs` 与 `make-candidate.mjs` 以退出码表达结果：`0` 通过，`1` 发现问题（错误详情在 stderr 或 `--json` 的 `findings` 里）。
+
+安装 skill 后，agent 会自动在合适的时机调用这些脚本；你也可以手动跑。
+
+---
+
+## 开发本仓库
+
+```bash
+git clone https://github.com/eryajf/dbx-plugin-skill.git
+cd dbx-plugin-skill
+npm test                      # 运行 65 项端到端自检
+
+# 以符号链接方式边改边用
+node bin/dbx-plugin-skill.mjs install --link --target dsh
+```
+
+`npm test` 覆盖：skill 结构完整性（frontmatter / 引用完整性）、预检脚本的正反例、`.dbxp` 校验与篡改检测、候选生成与哈希复核、安装器完整生命周期（在临时 HOME 中进行，不触碰真实环境）。
+
+常用脚本：
+
+```bash
+npm test                      # 端到端自检（CI 在 Node 18/20/22 上跑）
+npm run verify:package        # 校验 npm 打包内容与元数据
+npm run upstream:check        # 对比上游 DBX 契约是否变化
+npm run upstream:update       # 更新后重新基线化
+```
+
+---
+
+## 首次发布到 GitHub
+
+仓库当前**还没有 git 历史与远端**，按下面步骤落地（`package.json` 里的 `repository` 已指向 `eryajf/dbx-plugin-skill`，若用别的账号/名字记得同步改）：
+
+```bash
+cd dbx-plugin-skill
+git init -b main
+git add .
+git commit -m "feat: DBX 插件开发 skill（SKILL.md + 9 篇 reference + 4 个脚本 + npm 安装器）"
+git remote add origin git@github.com:eryajf/dbx-plugin-skill.git
+git push -u origin main
+```
+
+推送后到 GitHub 仓库 **Settings**：
+
+| 位置 | 建议 |
+| --- | --- |
+| Actions → General → Workflow permissions | 选 **Read and write**（Release 需要创建 release） |
+| Secrets and variables → Actions | 加 `NPM_TOKEN`（首次发布 npm 必填，见下） |
+| Features → Issues | 保持开启（上游漂移检查会开 issue） |
+
+---
+
+## 自动化（GitHub Actions）
+
+仓库内置三个 workflow：
+
+| Workflow | 触发 | 作用 |
+| --- | --- | --- |
+| `ci.yml` | push `main` / PR / 手动 | 在 Node 18/20/22 上跑 `npm test`；单独 job 校验 npm 打包内容并产出 `dbx-plugin-<version>.zip` 构建产物 |
+| `release.yml` | 打 `v*` tag / 手动（可 dry-run） | 校验 tag 与版本一致 → 跑测试 → 校验打包 → **发布 npm** → 创建 GitHub Release 并附带 `.tgz`、`.zip`、`SHA256SUMS.txt` |
+| `upstream-drift.yml` | 每周一 02:00 UTC / 手动 | 抓取上游 `manifest.schema.json`、`plugin-candidate.schema.json` 指纹与 npm 上 `@dbx-app/plugin-cli` 版本，与基线对比；有变化就创建或更新一个 `upstream-drift` issue |
+
+### 发一个新版本
+
+```bash
+npm version patch            # 或 minor / major：更新 package.json 并打 tag
+git push --follow-tags       # 推送提交与 tag → 自动触发 release.yml
+```
+
+`release.yml` 会做四件事：**校验 tag 与 `package.json` 版本一致**（不一致直接失败）、跑测试、发布 npm、创建 Release。想先空跑一次可以手动触发并勾选 `dry-run`。
+
+### npm 发布认证
+
+两条路，任选其一：
+
+1. **`NPM_TOKEN`（首次发布推荐）**：在 npmjs.com 生成 Automation token，加到仓库 Secret `NPM_TOKEN`。这是**首次发布唯一可行的自动化方式**（包还不存在时无法配置 Trusted Publisher）。
+2. **npm Trusted Publishing（OIDC，无需长期 token）**：包首次发布之后，在 npmjs.com 该包页面配置 Trusted Publisher —— Provider 选 GitHub Actions，仓库 `eryajf/dbx-plugin-skill`，Workflow 填 `release.yml`。之后从仓库删掉 `NPM_TOKEN`，workflow 会自动改用 OIDC 并带上 provenance。
+
+`release.yml` 的发布步骤会先判断 `NPM_TOKEN` 是否存在，再决定用哪种方式，所以两种配置都能直接跑。
+
+### 上游漂移检查
+
+skill 大量记录 DBX 的**契约细节**（字段枚举、权限语法、协议常量、商店校验规则）。上游一改，文档就可能过期。`upstream-drift.yml` 每周把这个契约的指纹与 `.github/upstream-baseline.json` 里的基线比对：
+
+- **只开 issue，不自动改基线** —— 保证提醒不会被静默吞掉。
+- 维护者按 issue 里的步骤核对并更新 `skill/references/*.md`，然后 `npm run upstream:update` 重新基线化并提交。
+- 只有 sha256 变化、事实无差异时，通常只是上游排版变动，确认后直接重新基线化即可。
+
+---
+
+## 更新已安装的 skill
+
+```bash
+dbx-plugin-skill doctor      # 会对比 npm 上的最新版本并给出升级提示
+npm install --global dbx-plugin-skill@latest && dbx-plugin-skill install
+```
+
+`install` 是幂等的：重新执行即覆盖为当前版本。想从源码跟随（不装 npm 包）就用 `--link`。
+
+---
+
+## 事实来源
+
+本 skill 的内容对齐以下权威来源，并在文档中标注了「文档 vs 脚本」的已知冲突：
+
+- 官方文档：<https://dbxio.com/cn/docs/plugin-development>
+- 上游平台仓库 `t8y2/dbx`：`plugins/manifest.schema.json`、`plugins/README.md`（完整贡献点与协议）、`plugins/RELEASING.md`、`plugins/sdk/{cli,packager,dev-host,rust,go}`
+- 官方商店仓库 `t8y2/dbx-store`：`CONTRIBUTING.md`、`schemas/plugin-candidate.schema.json`、`scripts/validate.mjs`、同步与签名 Workflow
+
+> 插件上架 PR 提到 **`t8y2/dbx-store`**，不是 `t8y2/dbx`。普通插件源码留在你自己的仓库。
+
+---
+
+## License
+
+MIT

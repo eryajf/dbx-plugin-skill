@@ -1,0 +1,128 @@
+{
+  "checkedAt": "2026-09-17T01:14:49.167Z",
+  "sources": {
+    "manifestSchema": {
+      "url": "https://raw.githubusercontent.com/t8y2/dbx/main/plugins/manifest.schema.json",
+      "sha256": "cbcc73c6f7417f0ae27d2c48d81e3ebaefc31d62b684e2c3abfe553504601e1a",
+      "facts": {
+        "topLevelFields": [
+          "$schema",
+          "contributions",
+          "description",
+          "engines",
+          "entrypoints",
+          "homepage",
+          "icon",
+          "id",
+          "localizations",
+          "manifest_version",
+          "name",
+          "permissions",
+          "publisher",
+          "source",
+          "version"
+        ],
+        "requiredTopLevel": [
+          "engines",
+          "id",
+          "manifest_version",
+          "name",
+          "publisher",
+          "version"
+        ],
+        "staticPermissions": [
+          "host.binary",
+          "host.events",
+          "host.filesystem",
+          "host.workbench"
+        ],
+        "networkPermissionPattern": "^host\\.network:https://[A-Za-z0-9._-]+(:[0-9]+)?$",
+        "fieldTypes": [
+          "boolean",
+          "number",
+          "password",
+          "radio",
+          "select",
+          "text",
+          "textarea"
+        ],
+        "bindings": [
+          "config",
+          "database",
+          "host",
+          "name",
+          "password",
+          "port",
+          "secret",
+          "username"
+        ],
+        "actionVariants": [
+          "default",
+          "destructive",
+          "ghost",
+          "outline",
+          "secondary"
+        ],
+        "actionWhen": [
+          "always",
+          "create",
+          "edit"
+        ],
+        "transports": [
+          "stdio-framed",
+          "stdio-jsonl"
+        ],
+        "contributionTypes": [],
+        "filesystemCapabilities": [
+          "delete",
+          "mkdir",
+          "read",
+          "rename",
+          "write"
+        ]
+      }
+    },
+    "candidateSchema": {
+      "url": "https://raw.githubusercontent.com/t8y2/dbx-store/main/schemas/plugin-candidate.schema.json",
+      "sha256": "ad79a8bea4c24ef54fb9e7aa61e40090fc9d8810994d65155f548c39b55715ee",
+      "facts": {
+        "required": [
+          "id",
+          "publisher",
+          "schemaVersion",
+          "targets",
+          "version"
+        ],
+        "topLevelFields": [
+          "description",
+          "homepage",
+          "icon",
+          "id",
+          "license",
+          "localizations",
+          "name",
+          "permissions",
+          "publisher",
+          "releaseNotes",
+          "schemaVersion",
+          "source",
+          "tags",
+          "targets",
+          "version"
+        ],
+        "additionalProperties": false,
+        "targetRequired": [
+          "sha256",
+          "size",
+          "target",
+          "url"
+        ],
+        "maxTargetsSize": 536870912
+      }
+    },
+    "pluginCli": {
+      "package": "@dbx-app/plugin-cli",
+      "version": "0.1.9"
+    }
+  }
+}

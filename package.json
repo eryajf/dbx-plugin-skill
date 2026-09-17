@@ -1,0 +1,49 @@
+{
+  "name": "dbx-plugin-skill",
+  "version": "1.0.0",
+  "description": "DBX 插件开发 skill：覆盖插件创建、开发、调试、打包、发布到 dbx-store 上架的全流程，安装到 DSH / Claude Code / agents 技能目录",
+  "type": "module",
+  "bin": {
+    "dbx-plugin-skill": "bin/dbx-plugin-skill.mjs"
+  },
+  "files": [
+    "bin",
+    "lib",
+    "skill",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node test/smoke.mjs",
+    "verify:package": "node tools/verify-package.mjs",
+    "upstream:check": "node tools/upstream-drift.mjs",
+    "upstream:update": "node tools/upstream-drift.mjs --update",
+    "release:patch": "npm version patch",
+    "release:minor": "npm version minor",
+    "prepublishOnly": "npm test && node tools/verify-package.mjs"
+  },
+  "keywords": [
+    "dbx",
+    "dbx-plugin",
+    "plugin",
+    "skill",
+    "agent-skill",
+    "deepseek-harness",
+    "claude-code"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/eryajf/dbx-plugin-skill.git"
+  },
+  "bugs": {
+    "url": "https://github.com/eryajf/dbx-plugin-skill/issues"
+  },
+  "homepage": "https://github.com/eryajf/dbx-plugin-skill#readme",
+  "publishConfig": {
+    "access": "public"
+  }
+}

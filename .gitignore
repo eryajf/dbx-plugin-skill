@@ -1,0 +1,19 @@
+node_modules/
+*.tgz
+.DS_Store
+*.log
+
+# 上游参考资料（本地抓取，不随仓库分发）
+tmp/
+
+# 本地开发时 skill 的安装产物
+.dsh/
+.agents/
+
+# 本地运行工具产生的中间文件
+release-assets/
+dist/
+drift.json
+drift.md
+comment.md
+notes.md
