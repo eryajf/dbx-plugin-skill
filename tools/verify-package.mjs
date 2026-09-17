@@ -47,6 +47,23 @@ const FORBIDDEN_NAMES = [".dbx-plugin-skill.json", ".DS_Store"];
 const problems = [];
 const problem = (message, hint) => problems.push(hint ? `${message}\n        → ${hint}` : message);
 
+/**
+ * `npm pack --dry-run --json` 的输出结构随 npm 大版本变化：
+ *   - npm <= 11: 数组 [ { name, version, files, ... } ]
+ *   - npm >= 12: 对象 { "<package-name>": { name, version, files, ... } }
+ * 这里统一成单个条目对象。
+ */
+function normalizePackOutput(parsed) {
+  if (Array.isArray(parsed)) return parsed[0] ?? null;
+  if (parsed !== null && typeof parsed === "object") {
+    const values = Object.values(parsed);
+    const direct = values.find((value) => value && typeof value === "object" && Array.isArray(value.files));
+    if (direct) return direct;
+    if (values.length === 1 && values[0] && typeof values[0] === "object") return values[0];
+  }
+  return null;
+}
+
 function packJson() {
   try {
     const output = execFileSync("npm", ["pack", "--dry-run", "--json"], {
@@ -54,7 +71,7 @@ function packJson() {
       encoding: "utf8",
       stdio: ["ignore", "pipe", "pipe"],
     });
-    return JSON.parse(output);
+    return normalizePackOutput(JSON.parse(output));
   } catch (error) {
     if (error.code === "ENOENT") {
       process.stderr.write("未找到 npm，无法校验打包内容。请在装有 npm 的环境中运行。\n");
@@ -72,9 +89,9 @@ function packJson() {
   }
 }
 
-const [entry] = packJson();
-if (!entry) {
-  process.stderr.write("npm pack --json 未返回任何条目\n");
+const entry = packJson();
+if (!entry || !Array.isArray(entry.files)) {
+  process.stderr.write("npm pack --json 未返回可解析的打包条目（顶层结构可能又变了）\n");
   process.exit(2);
 }
 

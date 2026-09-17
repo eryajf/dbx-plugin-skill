@@ -56,8 +56,13 @@ jobs:
         with:
           node-version: "22"
 
-      - name: 使用最新 npm（OIDC Trusted Publishing 需要 npm >= 11.5.1）
-        run: npm install --global npm@latest
+      # 固定到 npm 11.x：11.5.1+ 才支持 OIDC Trusted Publishing，
+      # 而 npm 12 要求 Node ^22.22.2 || ^24.15.0 || >=26，装在 Node 22 上不受支持，
+      # 且改了 `npm pack --json` 的输出结构。这里不追最新，保证可复现。
+      - name: 安装 npm 11（OIDC Trusted Publishing 需要 npm >= 11.5.1）
+        run: |
+          npm install --global "npm@^11.5.1"
+          npm --version
 
       - name: 校验 tag 与 package.json 版本一致
         if: startsWith(github.ref, 'refs/tags/')
