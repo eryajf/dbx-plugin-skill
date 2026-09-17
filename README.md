@@ -134,26 +134,19 @@ npm run upstream:update       # 更新后重新基线化
 
 ---
 
-## 首次发布到 GitHub
+## 仓库与仓库设置
 
-仓库当前**还没有 git 历史与远端**，按下面步骤落地（`package.json` 里的 `repository` 已指向 `eryajf/dbx-plugin-skill`，若用别的账号/名字记得同步改）：
+仓库地址：<https://github.com/eryajf/dbx-plugin-skill>（公开仓库，`--provenance` 需要公开仓库才能生成可验证的来源证明）。
 
-```bash
-cd dbx-plugin-skill
-git init -b main
-git add .
-git commit -m "feat: DBX 插件开发 skill（SKILL.md + 9 篇 reference + 4 个脚本 + npm 安装器）"
-git remote add origin git@github.com:eryajf/dbx-plugin-skill.git
-git push -u origin main
-```
+如果你要 fork 成自己的包发布，记得同步改 `package.json` 里的 `name`、`repository`、`homepage`、`bugs`，以及 `.github/workflows/release.yml` 里 Trusted Publisher 相关的注释。
 
-推送后到 GitHub 仓库 **Settings**：
+仓库维护者需要在 GitHub **Settings** 里确认：
 
 | 位置 | 建议 |
 | --- | --- |
-| Actions → General → Workflow permissions | 选 **Read and write**（Release 需要创建 release） |
-| Secrets and variables → Actions | 加 `NPM_TOKEN`（首次发布 npm 必填，见下） |
-| Features → Issues | 保持开启（上游漂移检查会开 issue） |
+| Actions → General → Workflow permissions | **Read and write**（Release 需要创建 release、上游漂移检查需要开 issue） |
+| Secrets and variables → Actions | 加 `NPM_TOKEN` —— 仅首次发布 npm 需要，之后切 Trusted Publishing 就可以删掉（见下） |
+| Features → Issues | 保持开启（`upstream-drift.yml` 会开 issue 提醒） |
 
 ---
 
