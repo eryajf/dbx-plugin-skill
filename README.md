@@ -144,9 +144,11 @@ npm run upstream:update       # 更新后重新基线化
 
 | 位置 | 建议 |
 | --- | --- |
-| Actions → General → Workflow permissions | **Read and write**（Release 需要创建 release、上游漂移检查需要开 issue） |
 | Secrets and variables → Actions | 加 `NPM_TOKEN` —— 仅首次发布 npm 需要，之后切 Trusted Publishing 就可以删掉（见下） |
 | Features → Issues | 保持开启（`upstream-drift.yml` 会开 issue 提醒） |
+| Actions → General → Workflow permissions | **无需修改**。三个 workflow 都显式声明了自己的 `permissions:`（`contents: write` / `id-token: write` / `issues: write`），会覆盖仓库默认值。只有当组织策略禁止 workflow 申请写权限时才需要处理 |
+
+> 排查提示：判断 `GITHUB_TOKEN` 的能力**不要**看 `GET /repos/{owner}/{repo}` 里的 `.permissions.push` —— 那个字段描述的是**用户角色**，对 app token 恒为 `false`，会造成误判。
 
 ---
 

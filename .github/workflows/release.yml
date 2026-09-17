@@ -39,21 +39,18 @@ jobs:
         with:
           fetch-depth: 0
 
-      # 在发布之前就检查权限：否则 npm 已发布成功、创建 Release 才失败，
-      # 会留下「npm 上有包、GitHub 上没有 Release」的半成品状态。
-      - name: 检查 GITHUB_TOKEN 是否具备写权限
+      # 仅记录诊断信息，不阻塞：本 workflow 已显式声明 permissions，
+      # 仓库默认值不影响它。注意不要用 repos/{repo} 的 .permissions.push 判断
+      # GITHUB_TOKEN 的能力 —— 那个字段描述的是「用户角色」，对 app token 恒为 false。
+      - name: 记录仓库 Actions 权限默认值（仅诊断）
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          perms=$(gh api "repos/${{ github.repository }}" --jq '.permissions.push' 2>/dev/null || echo "unknown")
-          echo "contents write = $perms"
-          if [ "$perms" = "false" ]; then
-            echo "::error::当前 GITHUB_TOKEN 无写权限，无法创建 Release。请到 Settings → Actions → General → Workflow permissions 选择 'Read and write permissions' 后重试。"
-            exit 1
-          fi
-          if [ "$perms" = "unknown" ]; then
-            echo "::warning::无法确认 token 权限（不影响后续步骤，但若创建 Release 失败请检查 Workflow permissions）"
-          fi
+          default=$(gh api "repos/${{ github.repository }}/actions/permissions/workflow" \
+            --jq '.default_workflow_permissions' 2>/dev/null || echo "unknown")
+          echo "仓库默认 workflow 权限: $default"
+          echo "本 workflow 已显式声明 permissions（contents: write, id-token: write），不依赖该默认值。"
 
       - uses: actions/setup-node@v4
         with:
@@ -140,15 +137,28 @@ jobs:
         run: |
           set -euo pipefail
           TAG="${GITHUB_REF_NAME}"
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            echo "→ Release $TAG 已存在，覆盖上传产物"
-            gh release upload "$TAG" release-assets/* --clobber
-          else
-            gh release create "$TAG" \
-              --title "dbx-plugin-skill v${VERSION}" \
-              --notes-file notes.md \
-              --generate-notes \
-              release-assets/*
+          release() {
+            if gh release view "$TAG" >/dev/null 2>&1; then
+              echo "→ Release $TAG 已存在，覆盖上传产物"
+              gh release upload "$TAG" release-assets/* --clobber
+            else
+              gh release create "$TAG" \
+                --title "dbx-plugin-skill v${VERSION}" \
+                --notes-file notes.md \
+                --generate-notes \
+                release-assets/*
+            fi
+          }
+          if ! release; then
+            {
+              echo "::error::创建/更新 GitHub Release 失败。"
+              echo "  npm 包已经发布成功，只差 GitHub Release；修好后重跑本 workflow 即可（npm 那步会因版本已存在而失败，可先手动执行 gh release create）。"
+              echo "  常见原因："
+              echo "  1) 组织策略禁止 workflow 申请 contents: write（本 workflow 已显式声明该权限，与仓库默认值无关）"
+              echo "  2) tag 与已有 Release 冲突，或 tag 受保护规则限制"
+              echo "  3) GH_TOKEN 被环境级 secret 扫描/策略拦截"
+            } >&2
+            exit 1
           fi
 
       - name: 汇总
