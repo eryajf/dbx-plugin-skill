@@ -39,6 +39,22 @@ jobs:
         with:
           fetch-depth: 0
 
+      # 在发布之前就检查权限：否则 npm 已发布成功、创建 Release 才失败，
+      # 会留下「npm 上有包、GitHub 上没有 Release」的半成品状态。
+      - name: 检查 GITHUB_TOKEN 是否具备写权限
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          perms=$(gh api "repos/${{ github.repository }}" --jq '.permissions.push' 2>/dev/null || echo "unknown")
+          echo "contents write = $perms"
+          if [ "$perms" = "false" ]; then
+            echo "::error::当前 GITHUB_TOKEN 无写权限，无法创建 Release。请到 Settings → Actions → General → Workflow permissions 选择 'Read and write permissions' 后重试。"
+            exit 1
+          fi
+          if [ "$perms" = "unknown" ]; then
+            echo "::warning::无法确认 token 权限（不影响后续步骤，但若创建 Release 失败请检查 Workflow permissions）"
+          fi
+
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
