@@ -5,9 +5,12 @@ name: Release
 #   npm version patch && git push --follow-tags
 #
 # 认证二选一：
-#   1) 配置仓库 Secret NPM_TOKEN（首次发布必须用它，或在本地手动 npm publish 一次）
-#   2) 不配置 Secret，改用 npm Trusted Publishing（OIDC）——需先在 npmjs.com 为该包配置
-#      Trusted Publisher: GitHub Actions / eryajf/dbx-plugin-skill / release.yml
+#   1) 用 Granular Access Token：仓库 Secret NPM_TOKEN，且该 token 必须勾选
+#      "Bypass two-factor authentication (2FA)"，否则 CI 无法完成发布动作。
+#      注意：npm 已移除经典/Automation token；带 Bypass 2FA 的直接发布将于 2027-01 起失效。
+#   2) npm Trusted Publishing（OIDC，推荐长期方案）：包首次发布后在 npmjs.com 配置
+#      Trusted Publisher: GitHub Actions / eryajf / dbx-plugin-skill / release.yml，
+#      勾选允许 npm publish，然后删掉 NPM_TOKEN。无需长期 token，也无过期问题。
 
 on:
   push:
@@ -78,8 +81,19 @@ jobs:
           if [ "${{ inputs.dry-run }}" = "true" ]; then
             echo "→ dry-run: 跳过实际发布"
             npm publish --access public --provenance --dry-run
-          else
-            npm publish --access public --provenance
+            exit 0
+          fi
+          if ! npm publish --access public --provenance; then
+            {
+              echo "::error::npm 发布失败，常见原因："
+              echo "  1) NPM_TOKEN 不是 Granular Access Token，或建 token 时没勾选"
+              echo "     'Bypass two-factor authentication (2FA)' —— CI 无法完成交互式 2FA"
+              echo "  2) token 已过期（看 token 的 Expiration）"
+              echo "  3) 已配置 Trusted Publisher 但仓库/用户名/workflow 文件名对不上"
+              echo "  4) package.json 版本已存在于 registry（同版本不能重复发布）"
+              echo "详见 README 的「npm 发布认证」一节。"
+            } >&2
+            exit 1
           fi
 
       - name: 生成 Release Notes

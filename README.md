@@ -178,12 +178,38 @@ git push --follow-tags       # 推送提交与 tag → 自动触发 release.yml
 
 ### npm 发布认证
 
-两条路，任选其一：
+> ⚠️ **2025 年 11 月起 npm 只支持 Granular Access Token，经典 / Automation token 已被移除。**
+> 另外，**带 Bypass 2FA 的「直接发布」token 正在被废弃，2027 年 1 月起将无法再用它直接发布新版本**。
+> 因此长期方案是 **Trusted Publishing（OIDC）**，token 只用于完成首次发布。
 
-1. **`NPM_TOKEN`（首次发布推荐）**：在 npmjs.com 生成 Automation token，加到仓库 Secret `NPM_TOKEN`。这是**首次发布唯一可行的自动化方式**（包还不存在时无法配置 Trusted Publisher）。
-2. **npm Trusted Publishing（OIDC，无需长期 token）**：包首次发布之后，在 npmjs.com 该包页面配置 Trusted Publisher —— Provider 选 GitHub Actions，仓库 `eryajf/dbx-plugin-skill`，Workflow 填 `release.yml`。之后从仓库删掉 `NPM_TOKEN`，workflow 会自动改用 OIDC 并带上 provenance。
+**第 1 步：首次发布（二选一）**
 
-`release.yml` 的发布步骤会先判断 `NPM_TOKEN` 是否存在，再决定用哪种方式，所以两种配置都能直接跑。
+- **本地手动发布（最省事）**：`npm login && npm publish --access public`。交互式 2FA 能正常完成，不必建 token。
+- **用 Granular Access Token**：npmjs.com → Access Tokens → Generate New Token → **Granular Access Token**，然后：
+  - **勾选 `Bypass two-factor authentication (2FA)`** —— CI 里没有交互式 2FA，不勾选会在发布时卡在 2FA 校验上失败；
+  - `Packages and scopes` → **`Read and write (publish and stage)`**；
+  - `Select packages` → 首次发布只能选 **`All packages`**（包还不存在，下拉里选不到它）；发布成功后建议收窄到 `dbx-plugin-skill`；
+  - `Organizations` → **`No access`**（组织权限只用于管理组织设置与成员，**与发布包无关**，给读写属于越权）；
+  - `Expiration` → 记下到期日，到期后 CI 会直接认证失败。
+  - 把 token 加到仓库 Secret `NPM_TOKEN`。
+
+**第 2 步：切到 Trusted Publishing（推荐，长期方案）**
+
+包首次发布后，在 npmjs.com 该包的 **Settings → Trusted Publisher** 添加：
+
+| 字段 | 值 |
+| --- | --- |
+| Provider | GitHub Actions |
+| Organization or user | `eryajf` |
+| Repository | `dbx-plugin-skill` |
+| Workflow filename | `release.yml`（只填文件名，必须与 `.github/workflows/` 下的文件同名） |
+| Allowed actions | 勾选允许 **`npm publish`**（否则只能 `npm stage publish`） |
+
+然后**从仓库删掉 `NPM_TOKEN`**，`release.yml` 会自动走 OIDC，不再有 token 过期问题。
+
+要求：npm CLI ≥ 11.5.1 且 Node ≥ 22.14.0（`release.yml` 已 `npm install -g npm@latest`）。仅支持 GitHub 托管 runner，自建 runner 不支持。
+
+`release.yml` 会先判断 `NPM_TOKEN` 是否存在：有就用 token，没有就走 OIDC —— 两种配置都能跑，可平滑迁移；发布失败时会额外打印常见原因提示。
 
 ### 上游漂移检查
 
@@ -215,9 +241,3 @@ npm install --global dbx-plugin-skill@latest && dbx-plugin-skill install
 - 官方商店仓库 `t8y2/dbx-store`：`CONTRIBUTING.md`、`schemas/plugin-candidate.schema.json`、`scripts/validate.mjs`、同步与签名 Workflow
 
 > 插件上架 PR 提到 **`t8y2/dbx-store`**，不是 `t8y2/dbx`。普通插件源码留在你自己的仓库。
-
----
-
-## License
-
-MIT
