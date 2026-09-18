@@ -16,7 +16,7 @@ description: DBX 插件开发全流程。Use when 创建、开发、调试、打
 | --- | --- | --- |
 | Manifest v1 | `manifest.json` | 插件身份、权限、入口、贡献点、国际化。运行时契约，**拒绝未声明字段** |
 | 构建配置 | `dbx-plugin.toml` | 打包包含哪些目录、是否有原生后端、dev 构建命令。**不进入插件包** |
-| Host API 1.x | `window.dbxPlugin` | 沙箱 UI 与 DBX 宿主通信 |
+| Host API 1.x | `window.dbxPlugin` / Sidecar callback | 沙箱 UI 与 DBX 宿主通信；Host API 1.1 支持 `host/requestUserInput` |
 | Sidecar Protocol v1 | stdin/stdout JSON-RPC | 可选原生后端与 DBX 通信 |
 | 包格式 | `.dbxp`（ZIP 容器） | DBX 实际安装的东西 |
 
@@ -103,6 +103,7 @@ dbx-plugin create my-plugin \
 - 前端入口由 `entrypoints.ui.entry` 指定，必须落在 `ui.root` 内（root 为 `ui` 时写 `ui/index.html`）。
 - 所有 UI 必须构建为包内静态资源；**不要把 Vite dev server 或 CDN 地址写进发行包**。
 - 需要原生能力（S3/SSH/系统凭据/长连接/高性能）才写 Sidecar。Sidecar 不是 OS 沙箱，以当前用户权限运行。
+- 连接表单可用 `visible_when` / `required_when` 的 `all_of`、`any_of`、`not` 组合条件，以及 `picker` 提供本地文件选择；依赖这些能力时设置足够新的 `engines.dbx`。
 
 ### 步骤 3：本地调试
 

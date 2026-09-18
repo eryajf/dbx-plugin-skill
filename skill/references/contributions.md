@@ -55,7 +55,8 @@
 - `select` / `radio` **必须**提供非空 `options`；每项 `{ "label": 非空, "value": 字符串 }`。其它类型**不允许**出现 `options`。
 - 可选：`description`、`placeholder`、`required`（bool）、`default`（string|number|boolean|null，必须符合字段类型）、`binding`。
 - 条件字段：
-  - `visible_when` / `required_when`：`{ "field": "<ident>", "one_of": ["v1", "v2"] }`（`one_of` 至少 1 项）。
+  - `picker`：仅用于 `text` / `password` / `textarea`，声明本地文件或目录选择；结构见下方。
+  - `visible_when` / `required_when`：叶子条件 `{ "field": "<ident>", "one_of": ["v1", "v2"] }`，也可用 `all_of`、`any_of`、`not` 递归组合（最多 8 层、64 个节点）。值按规范化字符串比较，`false` 与 `"false"` 等价。
 - `binding: "port"` **必须** `type: "number"`。
 - `binding` 为 `secret` / `name` / `host` / `username` / `password` / `database` 时，`type` 只能是 `text`、`password`、`select`、`radio`、`textarea`（不能是 `number`/`boolean`）。
 
@@ -70,6 +71,19 @@
 | 省略其它类型 | 不持久化到上述任一位置（仅表单值） |
 
 > **绝对不要**把密码、Token、私钥放到 `config`、Workbench context、事件或日志里。非敏感的补充配置才用 `config`。
+
+### `picker`（本地文件动作）
+
+`text`、`password`、`textarea` 字段可以声明：
+
+```json
+{ "key": "private_key_path", "label": "Private key", "type": "text", "binding": "config", "picker": { "kind": "file", "accept": [".pem", ".key"], "content_field": "private_key" } }
+```
+
+- `kind` 必填：`file` 或 `directory`；目录选择仅桌面端可用。
+- 桌面端把绝对路径写入当前字段；浏览器端把文件内容写入 `content_field` 兄弟字段并清空路径字段。两种来源互斥。
+- `accept` 最多 16 个唯一扩展名或 MIME 类型；浏览器上传上限 1 MiB。没有 `content_field` 的 picker 在浏览器端不可用。
+- 依赖 `picker` 时应把 `engines.dbx` 设为包含该能力的版本。
 
 插件连接的 `external_config` 会在新建、编辑、保存和重新连接流程中保留；升级插件时要显式迁移自己拥有的 `external_config`。
 

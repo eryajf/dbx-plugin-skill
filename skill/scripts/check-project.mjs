@@ -519,6 +519,7 @@ function checkConnectionProvider(contribution, at, declared, usage) {
         "default",
         "options",
         "binding",
+        "picker",
         "visible_when",
         "required_when",
       ];
@@ -557,14 +558,53 @@ function checkConnectionProvider(contribution, at, declared, usage) {
           }
         }
       }
+      if (field.picker !== undefined) {
+        const picker = field.picker;
+        if (!isPlainObject(picker)) {
+          error(`${fAt}.picker 必须是对象`);
+        } else {
+          const pickerAllowed = ["kind", "accept", "content_field"];
+          const extra = Object.keys(picker).filter((k) => !pickerAllowed.includes(k));
+          if (extra.length) error(`${fAt}.picker 含未知字段: ${extra.join(", ")}`);
+          if (!["text", "password", "textarea"].includes(field.type)) {
+            error(`${fAt}.picker 只能用于 text/password/textarea 字段`);
+          }
+          if (!["file", "directory"].includes(picker.kind)) {
+            error(`${fAt}.picker.kind 必须是 file 或 directory`);
+          }
+          if (picker.accept !== undefined) {
+            if (!Array.isArray(picker.accept) || picker.accept.length > 16 || new Set(picker.accept).size !== picker.accept.length || picker.accept.some((v) => typeof v !== "string" || !/^(\.[A-Za-z0-9]{1,16}|[A-Za-z0-9+*._-]{1,64}\/[A-Za-z0-9+*._-]{1,64})$/.test(v))) {
+              error(`${fAt}.picker.accept 必须是最多 16 个唯一的扩展名或 MIME 类型`);
+            }
+          }
+          if (picker.content_field !== undefined && (typeof picker.content_field !== "string" || !IDENTIFIER.test(picker.content_field))) {
+            error(`${fAt}.picker.content_field 必须是字段标识符`);
+          }
+        }
+      }
       for (const conditionKey of ["visible_when", "required_when"]) {
         const condition = field[conditionKey];
         if (condition === undefined) continue;
-        if (!isPlainObject(condition) || typeof condition.field !== "string" || !Array.isArray(condition.one_of) || condition.one_of.length === 0) {
-          error(`${fAt}.${conditionKey} 必须是 { field: string, one_of: [至少 1 项] }`);
-        } else if (Object.keys(condition).some((k) => !["field", "one_of"].includes(k))) {
-          error(`${fAt}.${conditionKey} 含未知字段`);
-        }
+        let conditionNodes = 0;
+        const validateCondition = (value, path, depth = 0) => {
+          conditionNodes += 1;
+          if (depth > 8 || conditionNodes > 64 || !isPlainObject(value)) { error(`${path} 条件嵌套无效、超过 8 层或超过 64 个节点`); return; }
+          const keys = Object.keys(value);
+          if (keys.length !== 1 && !(keys.length === 2 && keys.includes("field") && keys.includes("one_of"))) { error(`${path} 条件结构无效`); return; }
+          if ("field" in value || "one_of" in value) {
+            if (typeof value.field !== "string" || !IDENTIFIER.test(value.field) || !Array.isArray(value.one_of) || value.one_of.length === 0 || value.one_of.some((v) => !["string", "number", "boolean"].includes(typeof v))) error(`${path} 必须是 { field: 标识符, one_of: [字符串/数字/布尔值] }`);
+            return;
+          }
+          const operator = keys[0];
+          if (operator === "not") { validateCondition(value.not, `${path}.not`, depth + 1); return; }
+          if (operator === "all_of" || operator === "any_of") {
+            if (!Array.isArray(value[operator]) || value[operator].length === 0) { error(`${path}.${operator} 必须是非空数组`); return; }
+            value[operator].forEach((child, i) => validateCondition(child, `${path}.${operator}[${i}]`, depth + 1));
+            return;
+          }
+          error(`${path} 只支持 field/one_of、all_of、any_of、not`);
+        };
+        validateCondition(condition, `${fAt}.${conditionKey}`);
       }
     });
   }

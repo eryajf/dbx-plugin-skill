@@ -28,7 +28,7 @@ DBX 启动每个 Sidecar 后首先发送 `plugin/initialize`：
   "id": 1,
   "method": "plugin/initialize",
   "params": {
-    "host": { "dbxVersion": "0.5.68", "hostApiVersion": "1.0.0", "protocolVersions": [1] },
+    "host": { "dbxVersion": "0.5.68", "hostApiVersion": "1.1.0", "features": ["host.requestUserInput"], "protocolVersions": [1] },
     "plugin": { "id": "vendor.example", "version": "1.0.0" },
     "permissions": ["host.events"]
   }
@@ -133,7 +133,13 @@ kind: u8 | payload_length: u32 big-endian | payload
 
 **绝对不要在事件、context 或错误消息中泄露 Secret。**
 
-## 8. Rust SDK
+## 8. Host API 1.1：请求用户输入
+
+连接期间需要 MFA、主机密钥确认或账号选择时，Sidecar 可以在宿主已通告 `hostApiVersion >= 1.1.0` 或 `host.features` 含 `host.requestUserInput` 后发起 `host/requestUserInput`。插件发起的请求使用字符串 id；响应为 `{ "action": "submit", "value": "123456" }`、`{ "action": "cancel" }` 或 `{ "action": "timeout" }`。只有 `submit` 带值，其余必须失败关闭。`prompt` 最多 2000 字符，`timeoutSecs` 为 5–600（默认 300），同时最多 4 个未关闭提示。错误 `-32001` 表示无 UI，`-32601` 表示宿主不支持，`-32602` 表示参数非法；均应优雅降级。宿主在提示期间会暂停等待该提示的连接请求超时计时。
+
+Rust SDK 提供 `dbx_plugin_sdk::host_client()`、`HostClient::supports("host/requestUserInput")` 与 `HostClient::request_user_input(...)`。
+
+## 9. Rust SDK
 
 `dbx-plugin-sdk`（协议 v1，支持 JSONL 与 framed）。
 

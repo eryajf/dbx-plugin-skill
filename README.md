@@ -257,4 +257,9 @@ npm install --global dbx-plugin-skill@latest && dbx-plugin-skill install
 
 > 插件上架 PR 提到 **`t8y2/dbx-store`**，不是 `t8y2/dbx`。普通插件源码留在你自己的仓库。
 
+## 其他
 
+- [dbx](https://github.com/t8y2/dbx)：官方仓库
+- [dbx-store](https://github.com/t8y2/dbx-store)：应用商店仓库
+- [awesome-dbx-plugins](https://github.com/eryajf/awesome-dbx-plugins)：🦄 汇集优秀的 DBX 开源插件
+- [dbx-plugin-skill](https://github.com/eryajf/dbx-plugin-skill)：一个用于 DBX 插件开发 的 agent skill（技能包），覆盖从创建到上架官方商店的全链路
