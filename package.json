@@ -21,6 +21,8 @@
     "verify:package": "node tools/verify-package.mjs",
     "upstream:check": "node tools/upstream-drift.mjs",
     "upstream:update": "node tools/upstream-drift.mjs --update",
+    "upstream:sync": "node tools/upstream-sync.mjs",
+    "upstream:report": "node tools/upstream-sync.mjs --report-only",
     "release:patch": "npm version patch",
     "release:minor": "npm version minor",
     "prepublishOnly": "npm test && node tools/verify-package.mjs"

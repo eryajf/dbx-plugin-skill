@@ -130,6 +130,8 @@ npm test                      # 端到端自检（CI 在 Node 18/20/22 上跑）
 npm run verify:package        # 校验 npm 打包内容与元数据
 npm run upstream:check        # 对比上游 DBX 契约是否变化
 npm run upstream:update       # 更新后重新基线化
+npm run upstream:sync         # 只同步清单中的上游文件/目录到 tmp/upstream
+npm run upstream:report       # 查看最近一次稀疏快照的提交与文件哈希
 ```
 
 ---
@@ -214,6 +216,24 @@ skill 大量记录 DBX 的**契约细节**（字段枚举、权限语法、协�
 - 维护者按 issue 里的步骤核对并更新 `skill/references/*.md`，然后 `npm run upstream:update` 重新基线化并提交。
 - 只有 sha256 变化、事实无差异时，通常只是上游排版变动，确认后直接重新基线化即可。
 
+### 按需引用上游源码
+
+需要逐项核对实现、文档或 Workflow 时运行 `npm run upstream:sync`。它对 `t8y2/dbx` 使用
+Git partial clone + sparse checkout，只下载 `tools/upstream-sources.json` 中列出的 schema、
+插件开发文档和 SDK 子目录；`t8y2/dbx-store` 则使用 depth=1 全量浅克隆。内容保存到本地
+`tmp/upstream/`，不会进入提交或 npm 包。重复执行只 fetch 两个仓库的最新 `main`，并生成带
+commit 与 SHA-256 的快照报告。
+
+```bash
+npm run upstream:sync
+npm run upstream:report
+# 在 tmp/upstream/dbx 与 tmp/upstream/dbx-store 中核对后更新 skill/references/*.md
+npm test
+npm run upstream:update
+```
+
+需要扩大或缩小同步范围时，只修改 `tools/upstream-sources.json`，无需复制上游源码。
+
 ---
 
 ## 更新已安装的 skill
@@ -236,3 +256,5 @@ npm install --global dbx-plugin-skill@latest && dbx-plugin-skill install
 - 官方商店仓库 `t8y2/dbx-store`：`CONTRIBUTING.md`、`schemas/plugin-candidate.schema.json`、`scripts/validate.mjs`、同步与签名 Workflow
 
 > 插件上架 PR 提到 **`t8y2/dbx-store`**，不是 `t8y2/dbx`。普通插件源码留在你自己的仓库。
+
+

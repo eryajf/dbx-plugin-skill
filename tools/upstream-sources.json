@@ -1,0 +1,27 @@
+{
+  "dbx": {
+    "repo": "https://github.com/t8y2/dbx.git",
+    "ref": "main",
+    "paths": [
+      "plugins/manifest.schema.json",
+      "plugins/marketplace.schema.json",
+      "plugins/README.md",
+      "plugins/RELEASING.md",
+      "plugins/SIGNING.md",
+      "plugins/GETTING_STARTED.zh-CN.md",
+      "docs/content/docs/plugin-development.mdx",
+      "docs/content/docs/plugin-development.cn.mdx",
+      "plugins/sdk/cli",
+      "plugins/sdk/packager",
+      "plugins/sdk/dev-host",
+      "plugins/sdk/rust",
+      "plugins/sdk/go"
+    ]
+  },
+  "dbx-store": {
+    "repo": "https://github.com/t8y2/dbx-store.git",
+    "ref": "main",
+    "mode": "full",
+    "paths": []
+  }
+}
