@@ -49,6 +49,10 @@
 插件自定义的连接类型标识（如 `ssh`、`example-files`）。**它不会给 DBX 内置数据库枚举添加成员**；保存后存放在 `plugin_connection_type`。
 
 ### `fields`
+
+#### `connect_timeout_secs`（可选的内置字段键）
+
+如果传输或握手可能超过 DBX 默认的通用超时，可声明一个 `binding: "config"` 且 `key: "connect_timeout_secs"` 的 `number` 字段。DBX 会把用户值（或声明的 `default`）写入类型化连接配置，并让 `connection/test`、`connection/connect` 的请求 deadline 使用这个解析后的值；已保存的 `external_config` 优先于默认值。声明后，连接对话框里的通用超时选项不再覆盖该值。
 每个字段必须有 `key`（`identifier`）、`label`（非空）、`type`。
 
 - `type` 枚举：`text`、`password`、`number`、`boolean`、`select`、`radio`、`textarea`。

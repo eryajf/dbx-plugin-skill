@@ -104,6 +104,7 @@ dbx-plugin create my-plugin \
 - 所有 UI 必须构建为包内静态资源；**不要把 Vite dev server 或 CDN 地址写进发行包**。
 - 需要原生能力（S3/SSH/系统凭据/长连接/高性能）才写 Sidecar。Sidecar 不是 OS 沙箱，以当前用户权限运行。
 - 连接表单可用 `visible_when` / `required_when` 的 `all_of`、`any_of`、`not` 组合条件，以及 `picker` 提供本地文件选择；依赖这些能力时设置足够新的 `engines.dbx`。
+- 若握手可能超过通用超时，连接表单可声明 `config` 字段 `connect_timeout_secs`；DBX 会用其解析值作为 `connection/test` 与 `connection/connect` 的 deadline。Sidecar 进程按插件共享、跨标签页复用，后端会话应按 `connection.id` 管理。
 
 ### 步骤 3：本地调试
 
