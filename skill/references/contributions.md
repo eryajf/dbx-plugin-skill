@@ -38,6 +38,7 @@
   ],
   "workbench": "com.example.files.main",
   "capabilities": ["test", "connect", "disconnect"],
+  "proxy_route": false,
   "actions": [
     { "id": "refresh", "label": "Refresh metadata", "variant": "outline",
       "when": "edit", "requires_valid_form": true, "timeout_ms": 30000 }
@@ -94,6 +95,21 @@
 ### `capabilities`
 枚举 `test`、`connect`、`disconnect`，unique。声明什么就要实现什么（见 §2）。
 
+### `proxy_route`
+默认 `false`。Kafka `advertised.listeners`、集群发现等需要连接多个广播端点的协议应设为 `true`。配置传输层后，DBX 会在生命周期请求的 `runtime.proxy` 中提供 SOCKS5 路由，插件保持 `runtime.host` / `runtime.port` 作为逻辑引导端点，并通过该路由连接广播出的其它端点：
+
+```json
+{
+  "runtime": {
+    "host": "127.0.0.1",
+    "port": 49152,
+    "proxy": { "type": "socks5", "host": "127.0.0.1", "port": 49153, "username": "", "password": "" }
+  }
+}
+```
+
+SSH 作为最后一层时，路由是该跳板的动态 SOCKS5 端点；配置 SOCKS5 层时直接使用该代理。代理凭据与连接 Secret 走同一加密通道，绝不要记录日志。未声明该字段时继续使用单一远端端点的静态转发；如果标准 `host` / `port` 为空，DBX 会直接拒绝连接。
+
 ### `workbench` / `filesystem_provider`
 - `workbench`：指向本插件已声明的 workbench。打开该连接时进入自定义工作台。
 - `filesystem_provider`：指向本插件已声明的 filesystem-provider。打开该连接时连接生命周期 + 打开 DBX 通用文件管理器。
@@ -137,7 +153,7 @@
 ```
 
 - `connection` 只在**后端生命周期请求**中携带补齐的 Secret；前端只能拿到 `connectionId` 和非敏感导航上下文。
-- `runtime.host` / `runtime.port` 是**经过 DBX 隧道/代理转换后的最终端点**。协议插件必须连这里，**不要自己重建 DBX 隧道**。
+- `runtime.host` / `runtime.port` 是**经过 DBX 隧道/代理转换后的最终逻辑端点**。协议插件必须连接这里；声明 `proxy_route` 时，通过 `runtime.proxy` 的 SOCKS5 路由连接广播端点，**不要自己重建 DBX 隧道**。
 - 后端用 `connection.id` 保存会话。连接/断开应当**幂等**；长任务要有超时、取消与分块确认。
 - `test` 通常返回 `{ "success": true, "message": "..." }`。
 

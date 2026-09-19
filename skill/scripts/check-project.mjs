@@ -491,10 +491,15 @@ function checkConnectionProvider(contribution, at, declared, usage) {
     "workbench",
     "filesystem_provider",
     "capabilities",
+    "proxy_route",
     "actions",
   ];
   const extra = Object.keys(contribution).filter((k) => !allowed.includes(k));
   if (extra.length) error(`${at} 含未知字段: ${extra.join(", ")}`);
+
+  if (contribution.proxy_route !== undefined && typeof contribution.proxy_route !== "boolean") {
+    error(`${at}.proxy_route 必须是布尔值`);
+  }
 
   if (typeof contribution.database_type !== "string" || !IDENTIFIER.test(contribution.database_type)) {
     error(`${at}.database_type 是必需字段且必须是小写标识符（如 ssh、example-files）`);

@@ -141,21 +141,25 @@ permissions:
   contents: write
 jobs:
   release:
-    uses: t8y2/dbx/.github/workflows/plugin-release-reusable.yml@plugin-sdk-v1
+    uses: t8y2/dbx/.github/workflows/plugin-release-reusable.yml@plugin-cli-v<CLI_VERSION>
     with:
       release-tag: ${{ github.event.release.tag_name }}
       package-command: dbx-plugin package .
       package-path: dist/*.dbxp
       metadata-path: dist/*.artifact.json
-      plugin-cli-version: 0.1.6
+      plugin-cli-version: <CLI_VERSION>
       # 纯前端插件加这一行，只构建一个 universal 包：
       build-matrix: '{"include":[{"runner":"ubuntu-24.04","target":"universal"}]}'
 ```
 
-- **同时 pin 住 reusable workflow 的 ref 与 `plugin-cli-version`**，保证本地与 CI 用同一套 SDK 契约。
+- **同时 pin 住 reusable workflow 的 ref 与 `plugin-cli-version`**，并让两者使用同一个已发布的 CLI 版本（例如 `plugin-cli-v0.1.9` + `0.1.9`），保证本地与 CI 用同一套 SDK 契约。不要跟随 `main`；升级已有插件时，先确认对应的 reusable workflow tag 已发布。
 - 原生项目的默认矩阵覆盖 `darwin-arm64`、`darwin-x64`、`windows-x64`、`linux-x64`、`linux-arm64`。
 - 工作流会：安装 pin 的 CLI → 各 target 构建 → 拒绝含 `signature.json` 或含 `signingKeyId` 的候选 → 校验 target/sha256/size/包名与统一 Manifest 身份 → 上传候选包与合并的 `release-candidates.json`。
 - **官方作者不需要配置任何签名 Secret 或 Key ID。**
+
+生成的工作流会按模板跳过不需要的工具链：纯前端项目跳过 Rust/Go，Go 项目跳过 Rust，Rust 项目跳过 Go。前端依赖缓存跟随项目锁文件；pnpm 优先使用 `package.json#packageManager` 中的版本，只有已有锁文件但未声明版本时才使用 10.27.0 回退值；没有锁文件就不恢复依赖缓存。Go 模块/构建缓存会检查配置工作目录下的 `go.sum`，包括 `backend/go.sum`。Svelte 项目首次安装后应提交锁文件，发布工作流使用 `npm ci` 构建前端后再打包。
+
+源码构建的 CLI 可以生成尚未发布的工作流，但必须先发布匹配的 CLI 与 reusable workflow tag，再让插件仓库使用该工作流。已有插件固定在旧 tag 上时，不会自动获得这些改进；应在新 tag 发布后显式升级。
 
 ## 10. 打包后自检
 

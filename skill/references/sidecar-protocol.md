@@ -119,7 +119,7 @@ kind: u8 | payload_length: u32 big-endian | payload
 | `contextMenu/<contribution-id>` | 连接右键菜单，返回 `{ "message": "..." }` 弹 toast |
 | `filesystem/*` | 声明 filesystem-provider 时实现 |
 
-`connection` 只在**后端生命周期请求**中携带补齐的 Secret；`runtime.host` / `runtime.port` 是经过 DBX 隧道/代理后的**最终端点**，直接连它。
+`connection` 只在**后端生命周期请求**中携带补齐的 Secret；`runtime.host` / `runtime.port` 是经过 DBX 隧道/代理后的**最终逻辑端点**，直接连它。多端点协议若在 connection-provider 上声明 `proxy_route: true`，还会收到 `runtime.proxy` SOCKS5 路由，插件应通过它连接广播端点。
 
 ## 7. 事件
 

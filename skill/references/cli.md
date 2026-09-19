@@ -91,7 +91,7 @@ dbx-plugin create my-plugin \
 | `rust` | `frontend` 的基础文件换成 `common/*`，另加 `backend/Cargo.toml`、`backend/src/main.rs` |
 | `go` | 同上，另加 `backend/go.mod`、`backend/main.go` |
 
-生成的 `.gitignore` 已包含 `/dist/`、`/.dbx-dev/`、`.dbx-repository-signing-key.env`。
+生成的 `.gitignore` 已包含 `/dist/`、`/.dbx-dev/`、`.dbx-repository-signing-key.env`。生成的 Release workflow 会固定到与 CLI 相同的 `plugin-cli-v<version>` tag，并把同一版本传给 `plugin-cli-version`；不要把 reusable workflow 改成跟随 `main`。
 
 ### create 的校验规则
 
@@ -161,6 +161,8 @@ dist/<plugin-id>-<version>-<target>.artifact.json
 ```
 
 **打包行为要点**（详见 `packaging.md`）：只打包 `[package].include` 声明的目录；重写包内 `manifest.json` 的 backend executable；拒绝符号链接、`.dbx-dev`、越界路径、过大文件与不安全输出位置。
+
+生成的多平台 Release workflow 会按模板选择工具链和缓存：纯前端跳过 Rust/Go，Go 项目跳过 Rust，Rust 项目跳过 Go；npm/pnpm 缓存跟随锁文件，pnpm 使用 `package.json#packageManager`（仅旧锁文件项目回退到 10.27.0），没有锁文件时不恢复依赖缓存；Go 缓存使用工作目录下的 `go.sum`，包括 `backend/go.sum`。Svelte 项目应提交首次 `npm install` 生成的锁文件，工作流使用 `npm ci`。
 
 ## 5. `dbx-plugin keygen`（仅私有/自定义仓库运营方）
 

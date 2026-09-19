@@ -1,6 +1,6 @@
 # 发布与上架（dbx-store）参考
 
-> 本文件的结论来自 `t8y2/dbx-store` 当前源码（`scripts/validate.mjs`、`scripts/sync-release-candidate.mjs`、`scripts/discover-plugin-releases.mjs`、`scripts/finalize-candidates.mjs`、`.github/workflows/*`）与 `t8y2/dbx/plugins/RELEASING.md`。**当文档与脚本冲突时，以脚本为准** —— 文末列出已确认的冲突点。
+> 本文件的结论来自 `t8y2/dbx-store` 当前源码（`CONTRIBUTING.md`、`scripts/validate.mjs`、`scripts/sync-release-candidate.mjs`、`scripts/discover-plugin-releases.mjs`、`scripts/finalize-candidates.mjs`、`.github/workflows/*`）与 `t8y2/dbx/plugins/RELEASING.md`。**当文档与脚本冲突时，以脚本为准** —— 文末列出已确认的冲突点。
 >
 > 上游 `plugins/RELEASING.md` 仍描述「先开 Issue、再开 catalog PR」的两段式流程；**当前实际流程是「一个 PR」**，以 `dbx-store/CONTRIBUTING.md` 为准。
 
@@ -170,15 +170,12 @@ node <skill-root>/scripts/make-candidate.mjs . --release-notes "Initial release.
 - **不含联系人/邮箱/URL 要求**，也不含任何密钥。
 - `publisher` 字段引用的是记录的 **`id`**，不是 `name`。
 
-> ⚠️ **实测坑（文档未提）**：签名 Workflow 会先把 base 分支的 `publishers/` 覆盖回 PR 分支，**PR 里新增的 `publishers/<新id>.json` 会被删除**，随后校验失败 `publisher '<id>' is not registered`。
-> **实践做法**：新发布者记录必须先落到 `main`（单独提一个只加 publisher 的 PR 并合并，或请维护者登记），**再**在候选 PR 上运行 `/sign`。
-
 ## 7. 首次上架流程
 
 1. 插件源码放在**公开可审阅**的仓库。
 2. 每个支持的 target 构建未签名 `.dbxp`，发布到不可变 HTTPS 地址（Release / 对象存储 / CDN）。
 3. Fork `t8y2/dbx-store`，向 `main` 提**一个** PR：
-   - `publishers/<publisher-id>.json`（仅首次，**但要先合并到 main**，见 §6 的坑）；
+   - `publishers/<publisher-id>.json`（仅首次）；
    - `candidates/<plugin-id>.json`。
 4. 按 PR 模板填写：插件 ID/版本/发布者、源码仓库 + 精确 tag、capabilities、**每一项 Manifest 权限**以及数据/网络访问、原生 Sidecar 行为（纯前端写 None）、license、主页/支持地址。
 5. CI 会**故意保持红色**：`open candidate(s) awaiting DBX Store signing` —— 这是为了阻止未签名内容被合并。
@@ -222,6 +219,7 @@ node <skill-root>/scripts/make-candidate.mjs . --release-notes "Initial release.
 - `repository` 必须匹配 `^[^/]+/[A-Za-z0-9._-]+$`；`metadataPath` 不能含 `..`。
 - 同步只在**最新**的（非 draft、非 prerelease）Release 中查找名为 `release-candidates.json` 的资产；找不到就静默跳过（`No published candidate release found for <repo>`）。只拉取最近 30 个 Release。
 - 想让你的仓库加入自动同步，向 `dbx-store` 提一个登记 PR，或请维护者登记。**插件仓库不需要配置任何自动化 Secret。**
+- Store 侧自动同步使用独立 GitHub App，权限只需 Metadata read、Contents read/write、Pull requests read/write；`DBX_STORE_AUTOMATION_APP_ID` 与 `DBX_STORE_AUTOMATION_APP_PRIVATE_KEY` 只配置在 `dbx-store` 的 Actions secrets 中，并且必须与签名密钥 Secret 分离。插件作者无需接触这些凭据。
 
 ## 11. 审核与签名
 
@@ -328,7 +326,7 @@ https://raw.githubusercontent.com/t8y2/dbx-store/main/catalog/index.json
 
 | # | 文档说 | 脚本实际 |
 | --- | --- | --- |
-| 1 | `CONTRIBUTING.md` 说首次 PR 携带 `publishers/<id>.json` 即可 | 签名 overlay 会删除 PR 新增的 publisher 记录 → **必须先在 main 上登记** |
+| 1 | `CONTRIBUTING.md` 只描述候选内容 | 当前签名 Workflow 会先把 base 分支状态同步到 PR 分支，并保留 PR 新增的 publisher 记录，再校验并签名 |
 | 2 | `CONTRIBUTING.md` 说候选要「把 `verified` 保持 `false`」 | 候选**根本不能含** `verified` 字段 |
 | 3 | 上游 `RELEASING.md` 描述「先开 Issue，再开 catalog PR」 | 当前流程是**一个 PR**，无 Issue |
 | 4 | `README.md` 列的手动签名输入 | 实际还必需 `output-name`（且必须等于 `<id>-<version>-<target>.dbxp`）与 `sdk-ref` |

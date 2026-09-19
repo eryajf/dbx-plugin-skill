@@ -1,6 +1,6 @@
 ---
 name: dbx-plugin
-description: DBX 插件开发全流程。Use when 创建、开发、调试、打包、签名、发布或上架 DBX 插件；处理 manifest.json、dbx-plugin.toml、.dbxp 包、贡献点（connection-provider / workbench / filesystem-provider / context-menu / result-view）、Host API（window.dbxPlugin 桥接）、Rust/Go Sidecar 协议、dbx-plugin CLI（create / dev / package / keygen）、dbx-store 候选 PR 与 catalog 校验时使用。
+description: DBX 插件开发全流程。Use when 创建、开发、调试、打包、签名、发布或上架 DBX 插件；处理 manifest.json、dbx-plugin.toml、.dbxp 包、贡献点（connection-provider / proxy_route / workbench / filesystem-provider / context-menu / result-view）、Host API（window.dbxPlugin 桥接）、Rust/Go Sidecar 协议、dbx-plugin CLI（create / dev / package / keygen）、dbx-store 候选 PR 与 catalog 校验时使用。
 ---
 
 # DBX 插件开发
@@ -104,7 +104,7 @@ dbx-plugin create my-plugin \
 - 所有 UI 必须构建为包内静态资源；**不要把 Vite dev server 或 CDN 地址写进发行包**。
 - 需要原生能力（S3/SSH/系统凭据/长连接/高性能）才写 Sidecar。Sidecar 不是 OS 沙箱，以当前用户权限运行。
 - 连接表单可用 `visible_when` / `required_when` 的 `all_of`、`any_of`、`not` 组合条件，以及 `picker` 提供本地文件选择；依赖这些能力时设置足够新的 `engines.dbx`。
-- 若握手可能超过通用超时，连接表单可声明 `config` 字段 `connect_timeout_secs`；DBX 会用其解析值作为 `connection/test` 与 `connection/connect` 的 deadline。Sidecar 进程按插件共享、跨标签页复用，后端会话应按 `connection.id` 管理。
+- 若握手可能超过通用超时，连接表单可声明 `config` 字段 `connect_timeout_secs`；DBX 会用其解析值作为 `connection/test` 与 `connection/connect` 的 deadline。需要访问 Kafka `advertised.listeners` 或集群发现等多端点协议时，在 connection-provider 上声明 `proxy_route: true`，通过生命周期请求的 `runtime.proxy` SOCKS5 路由连接广播端点。Sidecar 进程按插件共享、跨标签页复用，后端会话应按 `connection.id` 管理。
 
 ### 步骤 3：本地调试
 
@@ -127,7 +127,7 @@ dbx-plugin package .
 
 ### 步骤 5：发布 Release（在自己的插件仓库）
 
-生成的 `.github/workflows/plugin-release.yml` 会在发布 GitHub Release 时产出各平台候选包、`.artifact.json` 和合并的 `release-candidates.json`。**不要把 `.dbxp` 提交进 Git**。
+生成的 `.github/workflows/plugin-release.yml` 会在发布 GitHub Release 时产出各平台候选包、`.artifact.json` 和合并的 `release-candidates.json`；它固定到与 CLI 相同的 `plugin-cli-v<version>` reusable workflow tag，并传入相同的 `plugin-cli-version`。**不要把 `.dbxp` 提交进 Git**。
 
 ### 步骤 6：进入官方商店
 

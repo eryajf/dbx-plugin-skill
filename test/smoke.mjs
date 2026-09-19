@@ -303,6 +303,13 @@ writeFileSync(join(badDir, "manifest.json"), `${JSON.stringify({
   engines: { host_api: "1" },
   permissions: ["host.network:http://evil.com"],
   entrypoints: { ui: { root: "ui", entry: "index.html" } },
+  contributions: [{
+    type: "connection-provider",
+    id: "com.example.bad.connection",
+    database_type: "bad",
+    fields: [],
+    proxy_route: "yes",
+  }],
 }, null, 2)}\n`);
 writeFileSync(join(badDir, "dbx-plugin.toml"), `schema_version = 1\n\n[package]\ninclude = ["ui", ".dbx-dev"]\n`);
 {
@@ -321,6 +328,7 @@ writeFileSync(join(badDir, "dbx-plugin.toml"), `schema_version = 1\n\n[package]\
   check("检出 ui.entry 不在 root 内", messages.includes("不在 root"));
   check("检出非 HTTPS 网络权限", messages.includes("host.network:http://evil.com"));
   check("检出 include 中的 .dbx-dev", messages.includes(".dbx-dev"));
+  check("检出 proxy_route 类型错误", messages.includes("proxy_route 必须是布尔值"));
 }
 
 const missingEntryDir = join(work, "missing-entry");
