@@ -205,6 +205,18 @@ SSH 作为最后一层时，路由是该跳板的动态 SOCKS5 端点；配置 S
 | `filesystem/delete` | `uri`、`recursive` | `{ success, message?, entry? }` |
 | `filesystem/rename` | `sourceUri`、`targetUri`、`overwrite` | `{ success, message?, entry? }` |
 
+### 宿主托管下载（`filesystem/download/*`）
+
+需要把远端对象保存到用户本地文件时，DBX 桌面宿主会管理保存对话框、临时文件、取消和进度，并调用插件后端的下载生命周期：
+
+1. `filesystem/download/open`：接收完整的下载选择参数（其中必须包含 `downloadId`，以及插件所需的 `providerId`、`connectionId` 等字段），返回对象元数据，至少包含 `size`。
+2. `filesystem/download/read`：重复读取分块，返回 `{ dataBase64, done }`。每个分块解码后不得超过 1 MiB；未完成时不能返回空分块。
+3. `filesystem/download/close`：无论成功、取消还是失败都会调用，用于释放插件侧会话。
+
+从 DBX `1511f11be1de3060e9ecdc51d86c90a1757a70a0` 的 `src-tauri/src/commands/plugin_download.rs` 变更起，`read` 与 `close` 的控制参数固定为 `{ downloadId, providerId, connectionId }`，不再重复携带 `open` 的完整选择参数。插件应按 `downloadId` 保存会话状态，并允许 `close` 幂等；不要假设每个分块请求都带有对象路径、筛选器或其它大字段。
+
+这条宿主托管下载通道与 `stdio-framed` 大文件流不同：它通过 JSON/base64 分块写入用户选择的本地文件；需要双向流、PTY/SFTP 或更大分块时，仍使用 framed 二进制通道和插件自定义的确认、取消、进度协议。
+
 ### 目录项与分页规则
 
 - 每项包含：`name`（**单个文件名**，不含 `/`、`\`，不能是 `.` 或 `..`）、完整 `uri`、`kind`（`file` | `directory` | `symlink` | `other`），可选 `size`、`modifiedAt`、`contentType`。
