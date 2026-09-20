@@ -2,7 +2,7 @@
 
 > 本文件的结论来自 `t8y2/dbx-store` 当前源码（`CONTRIBUTING.md`、`scripts/validate.mjs`、`scripts/sync-release-candidate.mjs`、`scripts/discover-plugin-releases.mjs`、`scripts/finalize-candidates.mjs`、`.github/workflows/*`）与 `t8y2/dbx/plugins/RELEASING.md`。**当文档与脚本冲突时，以脚本为准** —— 文末列出已确认的冲突点。
 >
-> 上游 `plugins/RELEASING.md` 仍描述「先开 Issue、再开 catalog PR」的两段式流程；**当前实际流程是「一个 PR」**，以 `dbx-store/CONTRIBUTING.md` 为准。
+> `dbx-store/CONTRIBUTING.md` 是当前提交流程的事实来源：**一个 PR** 同时承载候选、审核、受保护签名和目录回写。上游 `plugins/RELEASING.md` 中仍保留的“先开 Issue”文字已过时，不要照做。
 
 ## 1. 四类产物，四个归属
 
@@ -187,7 +187,7 @@ node <skill-root>/scripts/make-candidate.mjs . --release-notes "Initial release.
 
 1. 改代码 → **递增 `manifest.json` 的 `version`**（不要复用旧版本号）。
 2. 打新源码 Tag、发新 Release；**旧 Release 资产不可覆盖**。
-3. 若仓库已登记 `autoUpdate: true`，Store 的**每小时**同步 Workflow 会在最新 Release 中找到 `release-candidates.json`，自动创建/更新候选 PR：
+3. 若仓库已登记 `autoUpdate: true`，Store 的同步 Workflow 每小时左右（每 15 分钟排程以抵御 GitHub 调度丢失）会在最新 Release 中找到 `release-candidates.json`，自动创建/更新候选 PR：
    - 分支 `automation/plugin-release/<plugin-id>/<version>`
    - PR 标题 `feat(store): submit <plugin-id>@<version>`
    - 候选内容未变化时**不提交不推送**（幂等）

@@ -34,11 +34,14 @@ const locale = window.dbxPlugin.locale;
 | `readAssetUrl(path)` | 读取包内资源并返回对象 URL | — |
 | `openWorkbench(id, context)` | 打开本插件另一个工作台 | `host.workbench` |
 | `openFilesystem(id, context)` | 打开本插件的文件系统入口 | `host.filesystem` |
+| `getPlanCapabilities(connectionId)` / `explainPlan(request)` | 读取指定连接的估算执行计划 | `host.plans:read` |
 | `onInit(fn)` | 监听初始化/环境变化 | — |
 | `onEvent(fn)` | 监听后端事件 | `host.events` |
 
 常用 Host 内部方法（通过 `request` 调用）：`host.getContext`、`ui.readAsset`。
 **只调用协议中声明的方法**，不要调用未公开的 DBX 内部函数。
+
+计划 API 仅支持宿主允许的只读估算模式；实际执行计划和会产生副作用的语句会被宿主拒绝。初始化消息中的 `capabilities.planApi` 为假或缺失时，应隐藏相关 UI，而不是用请求试探能力。
 
 ## 3. context 与快照规则
 

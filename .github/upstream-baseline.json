@@ -1,9 +1,9 @@
 {
-  "checkedAt": "2026-09-19T02:05:52.307Z",
+  "checkedAt": "2026-09-20T13:28:51.982Z",
   "sources": {
     "manifestSchema": {
       "url": "https://raw.githubusercontent.com/t8y2/dbx/main/plugins/manifest.schema.json",
-      "sha256": "5fd9097c99e6803fc71c222197881616f35031349a3063222a83e9976a5eb14d",
+      "sha256": "2655e79938cf7f86830b24b4ed543e01c6f3550d99abe37db80a567d44464a00",
       "facts": {
         "topLevelFields": [
           "$schema",
@@ -34,6 +34,7 @@
           "host.binary",
           "host.events",
           "host.filesystem",
+          "host.plans:read",
           "host.workbench"
         ],
         "networkPermissionPattern": "^host\\.network:https://[A-Za-z0-9._-]+(:[0-9]+)?$",

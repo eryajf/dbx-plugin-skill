@@ -160,7 +160,7 @@ dbx-plugin package .
 - 已废弃字段会被 CLI 拒绝：`entrypoints.ui.kind`、`entrypoints.backend.binaries`、`entrypoints.backend.protocol`。
 
 **权限**
-- 只声明真正用到的权限，取最小集合：`host.workbench`、`host.events`、`host.filesystem`、`host.binary`、`host.network:https://host[:port]`（HTTPS、无路径/通配符/Token，最多 8 个）。
+- 只声明真正用到的权限，取最小集合：`host.workbench`、`host.events`、`host.filesystem`、`host.binary`、`host.plans:read`、`host.network:https://host[:port]`（HTTPS、无路径/通配符/Token，最多 8 个）。`host.plans:read` 仅开放宿主生成的估算执行计划读取。
 - `host.network` 只影响浏览器 CSP 的 `connect-src`，**不是** Sidecar 的网络防火墙，也仍受目标服务 CORS 约束。
 
 **安全**

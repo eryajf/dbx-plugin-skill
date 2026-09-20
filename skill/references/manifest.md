@@ -39,13 +39,15 @@
     "host.events",
     "host.filesystem",
     "host.binary",
+    "host.plans:read",
     "host.network:https://s3.example.com:443"
   ]
 }
 ```
 
 - `engines.host_api` 必需（`minLength: 1`，推荐 `"1"` 或 `"^1.0"`）；`engines.dbx` 可选，是产品版本范围（模板默认 `>=0.5.68`）。
-- 固定权限枚举：`host.events`、`host.binary`、`host.workbench`、`host.filesystem`。
+- 固定权限枚举：`host.events`、`host.binary`、`host.workbench`、`host.filesystem`、`host.plans:read`。
+- `host.plans:read` 只允许读取宿主生成的**估算执行计划**，不允许执行 SQL、写入、DDL/DML 或实际计划；调用前检查初始化能力中的 `planApi`。
 - 网络权限 `host.network:https://<host>[:port]`：
   - **必须 HTTPS**；主机名只允许 `[A-Za-z0-9._-]`，端口可选数字；
   - **不允许路径、通配符、Token**；
