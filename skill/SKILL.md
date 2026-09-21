@@ -16,7 +16,7 @@ description: DBX 插件开发全流程。Use when 创建、开发、调试、打
 | --- | --- | --- |
 | Manifest v1 | `manifest.json` | 插件身份、权限、入口、贡献点、国际化。运行时契约，**拒绝未声明字段** |
 | 构建配置 | `dbx-plugin.toml` | 打包包含哪些目录、是否有原生后端、dev 构建命令。**不进入插件包** |
-| Host API 1.x | `window.dbxPlugin` / Sidecar callback | 沙箱 UI 与 DBX 宿主通信；Host API 1.1 支持 `host/requestUserInput` |
+| Host API 1.x | `window.dbxPlugin` / Sidecar callback | 沙箱 UI 与 DBX 宿主通信；Host API 1.1 支持 `host/requestUserInput`，Host API 1.2 增加估算执行计划 API |
 | Sidecar Protocol v1 | stdin/stdout JSON-RPC | 可选原生后端与 DBX 通信 |
 | 包格式 | `.dbxp`（ZIP 容器） | DBX 实际安装的东西 |
 
@@ -162,6 +162,7 @@ dbx-plugin package .
 **权限**
 - 只声明真正用到的权限，取最小集合：`host.workbench`、`host.events`、`host.filesystem`、`host.binary`、`host.plans:read`、`host.network:https://host[:port]`（HTTPS、无路径/通配符/Token，最多 8 个）。`host.plans:read` 仅开放宿主生成的估算执行计划读取。
 - `host.network` 只影响浏览器 CSP 的 `connect-src`，**不是** Sidecar 的网络防火墙，也仍受目标服务 CORS 约束。
+- 估算执行计划 API 属于 Host API 1.2：需要 `host.plans:read`，并同时检查初始化能力 `capabilities.planApi` 与连接级支持；若插件无法在缺少该能力时工作，在 `engines.host_api` 声明 `^1.2`。
 
 **安全**
 - 密码、Token、私钥**绝不**放进 `config`、Workbench context、事件或日志；需要持久化的敏感值用 `binding: "secret"`。
@@ -238,6 +239,7 @@ node <skill-root>/scripts/dev-logs.mjs --port 5190 [--level error] [--follow] [-
 
 - `Sidecar identity or protocol does not match manifest`：初始化响应里的 `plugin.id`/`version` 与 `manifest.json` 不一致，或协议版本不在双方支持范围内。
 - 改完 UI 页面不刷新：编译型前端需要 `[dev].ui_watch`，且构建成功必须打印**独立一行** `DBX_UI_BUILD_SUCCESS`。
+- 桌面端文件选择、保存和系统拖放通过 `window.dbxPlugin.fileTransfer` 流式处理；Web 宿主没有该对象时回退到 `<input type="file">` 或 Sidecar 自己的传输协议。
 - `manifest.json contains unknown top-level field(s): ...`：写进了 Manifest v1 不接受的字段（常见于手写 `signingKeyId`、`verified`、自定义键）。
 - `... is not covered by [package].include`：`icon` / `ui.entry` 所指文件不在 `[package].include` 声明的目录内。
 - 原生插件 `target 'X' does not match build host 'Y'`：原生包必须在目标平台构建，用 CI 矩阵而不是本机交叉打包。

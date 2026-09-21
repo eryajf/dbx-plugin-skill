@@ -35,6 +35,7 @@ const locale = window.dbxPlugin.locale;
 | `openWorkbench(id, context)` | 打开本插件另一个工作台 | `host.workbench` |
 | `openFilesystem(id, context)` | 打开本插件的文件系统入口 | `host.filesystem` |
 | `getPlanCapabilities(connectionId)` / `explainPlan(request)` | 读取指定连接的估算执行计划 | `host.plans:read` |
+| `fileTransfer` | 桌面端经用户明确同意后的本地文件选择、保存和系统拖放流；Web 宿主通常不提供 | — |
 | `onInit(fn)` | 监听初始化/环境变化 | — |
 | `onEvent(fn)` | 监听后端事件 | `host.events` |
 
@@ -42,6 +43,12 @@ const locale = window.dbxPlugin.locale;
 **只调用协议中声明的方法**，不要调用未公开的 DBX 内部函数。
 
 计划 API 仅支持宿主允许的只读估算模式；实际执行计划和会产生副作用的语句会被宿主拒绝。初始化消息中的 `capabilities.planApi` 为假或缺失时，应隐藏相关 UI，而不是用请求试探能力。
+
+计划 API 属于 Host API 1.2。若插件不能在旧宿主上降级，应在 Manifest 中声明 `engines.host_api: "^1.2"`；即使声明了版本下限，也要保留 `capabilities.planApi` 的运行时检查。
+
+### 桌面文件传输与系统拖放
+
+桌面宿主可通过 `window.dbxPlugin.fileTransfer` 将用户明确选择或拖入工作台的本地文件按分块提供给插件。使用 `pick`/`beginSave` 打开原生对话框，使用 `read` 逐块读取；拖放通过 `onDrop` 接收。Web 宿主没有 `fileTransfer` 时应回退到 `<input type="file">` 或 Sidecar 自己的上传协议，不要假设浏览器可读取客户端绝对路径。
 
 ## 3. context 与快照规则
 
