@@ -34,7 +34,7 @@ const MANIFEST_TOP_FIELDS = [
   "localizations",
 ];
 
-const STATIC_PERMISSIONS = ["host.events", "host.binary", "host.workbench", "host.filesystem"];
+const STATIC_PERMISSIONS = ["host.events", "host.binary", "host.workbench", "host.filesystem", "host.plans:read", "host.storage"];
 const NETWORK_PERMISSION = /^host\.network:https:\/\/[A-Za-z0-9._-]+(?::[0-9]+)?$/;
 const MAX_NETWORK_PERMISSIONS = 8;
 

@@ -35,6 +35,7 @@ const locale = window.dbxPlugin.locale;
 | `openWorkbench(id, context)` | 打开本插件另一个工作台 | `host.workbench` |
 | `openFilesystem(id, context)` | 打开本插件的文件系统入口 | `host.filesystem` |
 | `getPlanCapabilities(connectionId)` / `explainPlan(request)` | 读取指定连接的估算执行计划 | `host.plans:read` |
+| `storage.get(key)` / `storage.set(key, value)` / `storage.delete(key)` | 持久化本插件工作台的小型 JSON 状态 | `host.storage` |
 | `fileTransfer` | 桌面端经用户明确同意后的本地文件选择、保存和系统拖放流；Web 宿主通常不提供 | — |
 | `onInit(fn)` | 监听初始化/环境变化 | — |
 | `onEvent(fn)` | 监听后端事件 | `host.events` |
@@ -45,6 +46,19 @@ const locale = window.dbxPlugin.locale;
 计划 API 仅支持宿主允许的只读估算模式；实际执行计划和会产生副作用的语句会被宿主拒绝。初始化消息中的 `capabilities.planApi` 为假或缺失时，应隐藏相关 UI，而不是用请求试探能力。
 
 计划 API 属于 Host API 1.2。若插件不能在旧宿主上降级，应在 Manifest 中声明 `engines.host_api: "^1.2"`；即使声明了版本下限，也要保留 `capabilities.planApi` 的运行时检查。
+
+### 持久化 UI 状态
+
+`window.dbxPlugin.storage` 为每个插件隔离的 JSON 键值存储，数据位于宿主的 `plugin-data/<id>` 下。单个值最大 256 KiB，插件总量最大 1 MiB；大数据应放到 Sidecar 的 `DBX_PLUGIN_DATA_DIR`。旧宿主不会提供该能力，调用前检查初始化消息中的 `capabilities.storage`，并在无法降级时把 `host.storage` 作为必要权限、把 `engines.host_api` 设置为对应的最低版本。
+
+```js
+await window.dbxPlugin.ready;
+if (window.dbxPlugin.capabilities.storage) {
+  await window.dbxPlugin.storage.set("filters", { sort: "name" });
+  const filters = await window.dbxPlugin.storage.get("filters");
+  await window.dbxPlugin.storage.delete("filters");
+}
+```
 
 ### 桌面文件传输与系统拖放
 
