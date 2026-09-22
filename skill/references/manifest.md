@@ -41,15 +41,17 @@
     "host.binary",
     "host.plans:read",
     "host.storage",
+    "host.ai",
     "host.network:https://s3.example.com:443"
   ]
 }
 ```
 
 - `engines.host_api` 必需（`minLength: 1`，推荐 `"1"` 或 `"^1.0"`）；依赖估算执行计划 API 的插件应声明 `"^1.2"`，并仍在运行时检查 `capabilities.planApi`；`engines.dbx` 可选，是产品版本范围（模板默认 `>=0.5.68`）。
-- 固定权限枚举：`host.events`、`host.binary`、`host.workbench`、`host.filesystem`、`host.plans:read`、`host.storage`。
+- 固定权限枚举：`host.events`、`host.binary`、`host.workbench`、`host.filesystem`、`host.plans:read`、`host.storage`、`host.ai`。
 - `host.plans:read` 只允许读取宿主生成的**估算执行计划**，不允许执行 SQL、写入、DDL/DML 或实际计划；调用前检查初始化能力中的 `planApi`。
 - `host.storage` 只允许使用工作台专属的小型 JSON 状态存储；单个值上限 256 KiB、每个插件总量上限 1 MiB，不能借此访问任意文件。调用前检查初始化能力中的 `storage`。
+- `host.ai` 允许工作台把插件提供的数据快照交给 DBX 内置 AI 面板创建对话；插件不会获得模型输出或模型配置。调用前检查初始化能力中的 `ai`；旧版宿主可能拒绝未知权限，因此需要兼容旧宿主时应将其作为可选能力。
 - 网络权限 `host.network:https://<host>[:port]`：
   - **必须 HTTPS**；主机名只允许 `[A-Za-z0-9._-]`，端口可选数字；
   - **不允许路径、通配符、Token**；

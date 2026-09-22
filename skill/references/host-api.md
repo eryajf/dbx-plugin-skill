@@ -36,6 +36,7 @@ const locale = window.dbxPlugin.locale;
 | `openFilesystem(id, context)` | 打开本插件的文件系统入口 | `host.filesystem` |
 | `getPlanCapabilities(connectionId)` / `explainPlan(request)` | 读取指定连接的估算执行计划 | `host.plans:read` |
 | `storage.get(key)` / `storage.set(key, value)` / `storage.delete(key)` | 持久化本插件工作台的小型 JSON 状态 | `host.storage` |
+| `ai.openConversation({ title, prompt, context, send? })` | 在 DBX 内置 AI 面板创建带快照的插件对话；`send` 默认 `false` | `host.ai` |
 | `fileTransfer` | 桌面端经用户明确同意后的本地文件选择、保存和系统拖放流；Web 宿主通常不提供 | — |
 | `onInit(fn)` | 监听初始化/环境变化 | — |
 | `onEvent(fn)` | 监听后端事件 | `host.events` |
@@ -59,6 +60,24 @@ if (window.dbxPlugin.capabilities.storage) {
   await window.dbxPlugin.storage.delete("filters");
 }
 ```
+
+### 在 DBX AI 中分析插件数据
+
+声明 `host.ai` 后，插件可以把当前数据的 JSON 快照交给内置 AI 面板：
+
+```js
+await window.dbxPlugin.ready;
+if (window.dbxPlugin.capabilities.ai) {
+  await window.dbxPlugin.ai.openConversation({
+    title: "分析结果",
+    prompt: "请找出异常并解释原因。",
+    context: { rows, source: "example", fetchedAt: new Date().toISOString() },
+    send: true,
+  });
+}
+```
+
+`title` 最多 200 字符，`prompt` 最多 32000 字符，`context` 必须是 JSON 对象且不超过 2 MiB。宿主保存快照作为会话历史，不向插件返回模型回复或模型配置；未配置模型时由用户在 DBX 面板中选择。旧宿主不广播 `capabilities.ai` 时应隐藏入口，不要用请求试探。
 
 ### 桌面文件传输与系统拖放
 

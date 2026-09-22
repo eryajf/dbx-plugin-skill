@@ -160,9 +160,9 @@ dbx-plugin package .
 - 已废弃字段会被 CLI 拒绝：`entrypoints.ui.kind`、`entrypoints.backend.binaries`、`entrypoints.backend.protocol`。
 
 **权限**
-- 只声明真正用到的权限，取最小集合：`host.workbench`、`host.events`、`host.filesystem`、`host.binary`、`host.plans:read`、`host.network:https://host[:port]`（HTTPS、无路径/通配符/Token，最多 8 个）。`host.plans:read` 仅开放宿主生成的估算执行计划读取。
+- 只声明真正用到的权限，取最小集合：`host.workbench`、`host.events`、`host.filesystem`、`host.binary`、`host.plans:read`、`host.storage`、`host.ai`、`host.network:https://host[:port]`（HTTPS、无路径/通配符/Token，最多 8 个）。`host.plans:read` 仅开放宿主生成的估算执行计划读取。
 - `host.network` 只影响浏览器 CSP 的 `connect-src`，**不是** Sidecar 的网络防火墙，也仍受目标服务 CORS 约束。
-- 估算执行计划 API 属于 Host API 1.2：需要 `host.plans:read`，并同时检查初始化能力 `capabilities.planApi` 与连接级支持；若插件无法在缺少该能力时工作，在 `engines.host_api` 声明 `^1.2`。工作台持久化小状态使用 `host.storage` 与 `window.dbxPlugin.storage`（单值 256 KiB、插件总量 1 MiB），并检查初始化能力 `capabilities.storage`。
+- 估算执行计划 API 属于 Host API 1.2：需要 `host.plans:read`，并同时检查初始化能力 `capabilities.planApi` 与连接级支持；若插件无法在缺少该能力时工作，在 `engines.host_api` 声明 `^1.2`。工作台持久化小状态使用 `host.storage` 与 `window.dbxPlugin.storage`（单值 256 KiB、插件总量 1 MiB），并检查初始化能力 `capabilities.storage`。需要把数据快照交给 DBX 内置 AI 面板时声明 `host.ai`，调用 `window.dbxPlugin.ai.openConversation` 前检查 `capabilities.ai`；该 API 不返回模型输出，旧宿主缺少该能力时应优雅降级。
 
 **安全**
 - 密码、Token、私钥**绝不**放进 `config`、Workbench context、事件或日志；需要持久化的敏感值用 `binding: "secret"`。
