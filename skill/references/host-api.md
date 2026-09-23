@@ -125,6 +125,28 @@ button {
 
 `document.documentElement.dataset.dbxTheme` 反映当前外观。
 
+### 主题负载中的编辑器设置
+
+`dbxPlugin.theme` 与 `dbx-plugin-env` 环境消息中的主题负载可以包含 `{ appearance, tokens, editor? }`。`tokens` 是从文档根节点按 `--color-*`、`--radius-*`、`--font-*` 前缀收集的 CSS 变量；`editor` 是 SQL 编辑器设置的结构化快照，不会转换成 CSS token。
+
+| 宿主设置 | 插件可读值 |
+| --- | --- |
+| 外观 | `theme.appearance`：`light` 或 `dark` |
+| 调色板、自定义颜色 | `theme.tokens` 中的 `--color-*` |
+| 圆角风格 | `theme.tokens` 中的 `--radius-*` |
+| UI 字体 | `theme.tokens["--font-sans"]` |
+| 编辑器等宽字体 | `theme.tokens["--font-mono"]` 与 `theme.editor.fontFamily` |
+| 编辑器字号 | `theme.editor.fontSize` |
+| SQL 编辑器语法主题 | `theme.editor.theme` |
+
+宿主窗口缩放、数据网格字体和类型配色、编辑器背景图不会传给插件。插件可以将 `theme.editor.fontSize` 用作自身控件的默认字号；字号仍由插件 UI 自己决定。字体族变化通过主题修订更新，字号和语法主题变化也会经 `dbx-plugin-env` 推送，无需刷新页面。
+
+### 动态导入与代码分割
+
+发行包的 UI 入口脚本由宿主内联进沙箱文档。其它 `ui/` 资源仍可通过插件资源协议按需加载，因此动态 `import()` 和 CSS chunk 可用。宿主会向文档注入 `<base>`，插件资源地址限定在本插件的 `ui.root` 下；Vite 请设置 `base: "./"`，webpack 请设置 `output.publicPath: "./"`，让 chunk 与样式表使用相对地址。
+
+不要使用 `/assets/...` 这样的根绝对路径：它缺少插件 ID，无法解析到插件资源，会在宿主中返回 404。DBX 会将资源请求限制在各插件自己的 `ui.root` 内；WebView2 使用 `http://dbx-plugin.localhost/<plugin-id>/...` 映射，其它平台使用 `dbx-plugin://localhost/<plugin-id>/...`。更新插件后不会复用旧资源缓存。
+
 **环境变化事件**：先读 `dbxPlugin.locale`/`theme` 初始化，再监听：
 
 ```js
