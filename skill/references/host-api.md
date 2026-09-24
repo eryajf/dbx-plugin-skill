@@ -35,6 +35,7 @@ const locale = window.dbxPlugin.locale;
 | `openWorkbench(id, context)` | 打开本插件另一个工作台 | `host.workbench` |
 | `openFilesystem(id, context)` | 打开本插件的文件系统入口 | `host.filesystem` |
 | `getPlanCapabilities(connectionId)` / `explainPlan(request)` | 读取指定连接的估算执行计划 | `host.plans:read` |
+| `getTableMetadata({ connectionId, database?, schema?, table })` | 读取已打开连接中单个 table 的窄化结构元数据 | `host.schema:read` |
 | `storage.get(key)` / `storage.set(key, value)` / `storage.delete(key)` | 持久化本插件工作台的小型 JSON 状态 | `host.storage` |
 | `ai.openConversation({ title, prompt, context, send? })` | 在 DBX 内置 AI 面板创建带快照的插件对话；`send` 默认 `false` | `host.ai` |
 | `fileTransfer` | 桌面端经用户明确同意后的本地文件选择、保存和系统拖放流；Web 宿主通常不提供 | — |
@@ -47,6 +48,29 @@ const locale = window.dbxPlugin.locale;
 计划 API 仅支持宿主允许的只读估算模式；实际执行计划和会产生副作用的语句会被宿主拒绝。初始化消息中的 `capabilities.planApi` 为假或缺失时，应隐藏相关 UI，而不是用请求试探能力。
 
 计划 API 属于 Host API 1.2。若插件不能在旧宿主上降级，应在 Manifest 中声明 `engines.host_api: "^1.2"`；即使声明了版本下限，也要保留 `capabilities.planApi` 的运行时检查。
+
+### 表结构元数据（Host API 1.3）
+
+声明 `host.schema:read` 后，插件可以读取 DBX 已打开连接中一个 table 的窄化、只读 schema metadata。调用前检查 `capabilities.schemaMetadataApi`，不要通过真实请求试探旧宿主：
+
+```js
+await window.dbxPlugin.ready;
+if (window.dbxPlugin.capabilities.schemaMetadataApi) {
+  const metadata = await window.dbxPlugin.getTableMetadata({
+    connectionId,
+    database,
+    schema,
+    table: "users",
+  });
+  renderColumns(metadata.columns);
+}
+```
+
+返回的 `columns` 只包含 `name`、`dataType`、`nullable` 以及可选的 `length`、`precision`、`scale`、`default`；不会返回注释、索引/键、凭据、连接串、驱动对象或任意 SQL 结果。`fieldCapabilities` 对可选字段报告 `supported`、`unsupported` 或 `unknown`，`unknown` 不应当作支持。
+
+`connectionId` 与 `table` 必须是非空 identity 值（最多 256 字符）；`database`、`schema` 不可用时省略，不要传空字符串。DBX 只复用已经打开的 Host connection/session：已保存但断开的连接、未打开的数据库 session 会返回错误，宿主不会替插件重连、建立连接池或执行 SQL。
+
+该 API 属于 Host API 1.3。无法在缺少它时工作的插件应声明 `engines.host_api: "^1.3"`，同时保留 `schemaMetadataApi` 能力检查；没有 `host.schema:read` 时，调用会在到达 backend 前被拒绝。
 
 ### 持久化 UI 状态
 

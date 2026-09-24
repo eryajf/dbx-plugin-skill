@@ -16,7 +16,7 @@ description: DBX 插件开发全流程。Use when 创建、开发、调试、打
 | --- | --- | --- |
 | Manifest v1 | `manifest.json` | 插件身份、权限、入口、贡献点、国际化。运行时契约，**拒绝未声明字段** |
 | 构建配置 | `dbx-plugin.toml` | 打包包含哪些目录、是否有原生后端、dev 构建命令。**不进入插件包** |
-| Host API 1.x | `window.dbxPlugin` / Sidecar callback | 沙箱 UI 与 DBX 宿主通信；Host API 1.1 支持 `host/requestUserInput`，Host API 1.2 增加估算执行计划 API |
+| Host API 1.x | `window.dbxPlugin` / Sidecar callback | 沙箱 UI 与 DBX 宿主通信；Host API 1.1 支持 `host/requestUserInput`，Host API 1.2 增加估算执行计划 API，Host API 1.3 增加表结构元数据 API |
 | Sidecar Protocol v1 | stdin/stdout JSON-RPC | 可选原生后端与 DBX 通信 |
 | 包格式 | `.dbxp`（ZIP 容器） | DBX 实际安装的东西 |
 
@@ -160,7 +160,7 @@ dbx-plugin package .
 - 已废弃字段会被 CLI 拒绝：`entrypoints.ui.kind`、`entrypoints.backend.binaries`、`entrypoints.backend.protocol`。
 
 **权限**
-- 只声明真正用到的权限，取最小集合：`host.workbench`、`host.events`、`host.filesystem`、`host.binary`、`host.plans:read`、`host.storage`、`host.ai`、`host.network:https://host[:port]`（HTTPS、无路径/通配符/Token，最多 8 个）。`host.plans:read` 仅开放宿主生成的估算执行计划读取。
+- 只声明真正用到的权限，取最小集合：`host.workbench`、`host.events`、`host.filesystem`、`host.binary`、`host.plans:read`、`host.schema:read`、`host.storage`、`host.ai`、`host.network:https://host[:port]`（HTTPS、无路径/通配符/Token，最多 8 个）。`host.plans:read` 仅开放宿主生成的估算执行计划读取；`host.schema:read` 仅开放已打开连接中单个 table 的窄化结构元数据。
 - `host.network` 只影响浏览器 CSP 的 `connect-src`，**不是** Sidecar 的网络防火墙，也仍受目标服务 CORS 约束。
 - 估算执行计划 API 属于 Host API 1.2：需要 `host.plans:read`，并同时检查初始化能力 `capabilities.planApi` 与连接级支持；若插件无法在缺少该能力时工作，在 `engines.host_api` 声明 `^1.2`。工作台持久化小状态使用 `host.storage` 与 `window.dbxPlugin.storage`（单值 256 KiB、插件总量 1 MiB），并检查初始化能力 `capabilities.storage`。需要把数据快照交给 DBX 内置 AI 面板时声明 `host.ai`，调用 `window.dbxPlugin.ai.openConversation` 前检查 `capabilities.ai`；该 API 不返回模型输出，旧宿主缺少该能力时应优雅降级。
 

@@ -1,6 +1,6 @@
 {
   "name": "dbx-plugin-skill",
-  "version": "0.1.10",
+  "version": "0.1.11",
   "description": "DBX 插件开发 skill：覆盖插件创建、开发、调试、打包、发布到 dbx-store 上架的全流程，安装到 DSH / Claude Code / agents 技能目录",
   "type": "module",
   "bin": {
