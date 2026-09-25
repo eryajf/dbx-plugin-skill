@@ -139,7 +139,17 @@ kind: u8 | payload_length: u32 big-endian | payload
 
 Rust SDK 提供 `dbx_plugin_sdk::host_client()`、`HostClient::supports("host/requestUserInput")` 与 `HostClient::request_user_input(...)`。
 
-## 9. Rust SDK
+## 9. 向 DBX 内置 AI Agent 提供工具
+
+原生 Sidecar 可实现 `mcp/tools` 和 `mcp/call`，让用户在「插件中心 → 已安装 → 内置 AI 工具」开启后，由 Agent 模式调用已打开插件连接上的工具。这与工作台的 `host.ai` 快照对话是两条独立能力。
+
+- `mcp/tools` 接收宿主绑定的 `{ "connectionId": "<已打开连接 ID>" }`，返回 `{ "tools": [{ "name", "description", "inputSchema", "annotations"? }] }`；可依据连接是否只读隐藏写工具。
+- `mcp/call` 接收 `{ "tool", "arguments", "lifecycle" }`，返回 MCP `CallToolResult`，例如 `{ "content": [{ "type": "text", "text": "..." }], "isError": false }`。`lifecycle` 是已打开连接的 `connection/connect` 载荷，宿主已解析凭据和传输端点；不要把密钥放进工具参数或输出。
+- 宿主只向已打开的连接提供工具。模型看到的 schema 不含 `connectionId` / `connectionName`，绑定连接 ID 由宿主注入；多个连接由额外的 `dbx_connection` 参数选择。
+- 仅 `annotations.readOnlyHint: true` 的工具可直接执行；其他调用会展示完整转发参数，请用户逐次允许或拒绝，五分钟未响应即拒绝。插件自身仍须落实只读和写入保护。
+- 对外名称为 `<前缀>__<工具名>`；参数名使用字母、数字和下划线，Schema 仅使用宿主支持的可移植子集：`type`、`description`、`properties`、`required`、`items`、字符串 `enum` 及数值、长度和数组数量边界。单次调用最多 120 秒，长任务应返回后台任务句柄。工具输出是供模型读取的不可信数据，只返回事实，不夹带指令。
+
+## 10. Rust SDK
 
 `dbx-plugin-sdk`（协议 v1，支持 JSONL 与 framed）。
 
@@ -183,7 +193,7 @@ API 速览：
 - 默认 **2–16 个 worker 线程**（按可用并行度）与 **256 任务队列**；`worker_threads(0)` / `work_queue_capacity(0)` 会被 clamp 到 1。
 - `PluginTransport::Framed` 需要在 manifest 声明 `"transport": "stdio-framed"`。
 
-## 9. Go SDK
+## 11. Go SDK
 
 ```go
 metadata := dbxpluginsdk.Metadata{
@@ -211,7 +221,7 @@ API 速览：
 - Go SDK 当前支持 JSONL；**framed 也支持**（`TransportFramed`）。
 - 不要只改 Manifest 的 `transport` 就认为 Go 已具备二进制帧处理能力 —— 必须真正用 framed 并实现 `HandleBinary`。
 
-## 10. 构建集成
+## 12. 构建集成
 
 模板生成的项目已经接好 SDK，正常路径是直接用 CLI：
 
@@ -225,7 +235,7 @@ dbx-plugin dev                # Rust 用 debug target；Go 用缓存输出目录
 - **不要绕过 CLI 直接 `cargo build` / `go build`**，除非你自己设置了 `DBX_PLUGIN_SDK_ROOT`，或把依赖改成显式 path/git。
 - 开发未发布的 SDK：`dbx-plugin create ... --sdk-root /path/to/dbx`，或打包前 `export DBX_PLUGIN_SDK_ROOT=/path/to/dbx`。
 
-## 11. 工程约束清单
+## 13. 工程约束清单
 
 - [ ] stdout 只输出协议消息，日志一律 stderr。
 - [ ] `plugin/initialize` 里的 id/version 与 manifest 一致。
@@ -236,7 +246,7 @@ dbx-plugin dev                # Rust 用 debug target；Go 用缓存输出目录
 - [ ] 用 framed 时 manifest 声明 `stdio-framed` + `host.binary`。
 - [ ] release 构建开启 strip/lto 控制体积（模板已配置）。
 
-## 12. 常见错误
+## 14. 常见错误
 
 | 报错 | 原因 |
 | --- | --- |

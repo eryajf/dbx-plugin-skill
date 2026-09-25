@@ -36,6 +36,9 @@ const locale = window.dbxPlugin.locale;
 | `openFilesystem(id, context)` | 打开本插件的文件系统入口 | `host.filesystem` |
 | `getPlanCapabilities(connectionId)` / `explainPlan(request)` | 读取指定连接的估算执行计划 | `host.plans:read` |
 | `getTableMetadata({ connectionId, database?, schema?, table })` | 读取已打开连接中单个 table 的窄化结构元数据 | `host.schema:read` |
+| `queryData({ connectionId, database?, schema?, sql, maxRows?, timeoutMs? })` | 在用户已授权的连接上执行单条只读 SQL | `host.data:read` |
+| `copy(text)` / `clipboard.writeText(text)` | 写入系统剪贴板 | — |
+| `clipboard.readText()` | 读取系统剪贴板 | `host.clipboard:read` |
 | `storage.get(key)` / `storage.set(key, value)` / `storage.delete(key)` | 持久化本插件工作台的小型 JSON 状态 | `host.storage` |
 | `ai.openConversation({ title, prompt, context, send? })` | 在 DBX 内置 AI 面板创建带快照的插件对话；`send` 默认 `false` | `host.ai` |
 | `fileTransfer` | 桌面端经用户明确同意后的本地文件选择、保存和系统拖放流；Web 宿主通常不提供 | — |
@@ -71,6 +74,29 @@ if (window.dbxPlugin.capabilities.schemaMetadataApi) {
 `connectionId` 与 `table` 必须是非空 identity 值（最多 256 字符）；`database`、`schema` 不可用时省略，不要传空字符串。DBX 只复用已经打开的 Host connection/session：已保存但断开的连接、未打开的数据库 session 会返回错误，宿主不会替插件重连、建立连接池或执行 SQL。
 
 该 API 属于 Host API 1.3。无法在缺少它时工作的插件应声明 `engines.host_api: "^1.3"`，同时保留 `schemaMetadataApi` 能力检查；没有 `host.schema:read` 时，调用会在到达 backend 前被拒绝。
+
+### 只读数据查询（Host API 1.4）
+
+声明 `host.data:read`，调用前检查 `capabilities.dataApi`。宿主会在插件首次查询每个连接时请求用户同意；授权可在「插件中心 → 已安装」撤销，拒绝在当前工作台会话内保留。Web 宿主无法显示授权确认时会拒绝调用。
+
+```js
+await window.dbxPlugin.ready;
+if (window.dbxPlugin.capabilities.dataApi) {
+  const result = await window.dbxPlugin.queryData({
+    connectionId,
+    database,
+    sql: "SELECT status, count(*) AS total FROM orders GROUP BY status",
+    maxRows: 200,
+  });
+  render(result.columns, result.rows, result.truncated);
+}
+```
+
+返回 `{ dbType, columns, rows, truncated, elapsedMs }`，其中列项包含 `name` 和 `dataType`。只允许一条经宿主风险分类器判定为只读的 SQL；写入、DDL、`SELECT … FOR UPDATE`、多语句和 `USE` 均会被拒绝。仅复用已打开的 SQL 连接，不会重新连接或提供凭据。`maxRows` 默认 500、最大 5000，序列化行数据最多 8 MiB；`timeoutMs` 不超过连接自身超时和 60 秒。授权撤销后会收到 `PLUGIN_DATA_ACCESS_NOT_GRANTED` 错误。必须依赖该能力时声明 `engines.host_api: "^1.4"`，并保留能力检查。
+
+### 系统剪贴板（读取属于 Host API 1.3）
+
+沙箱不能直接使用 `navigator.clipboard`。写入用 `copy(text)` 或 `clipboard.writeText(text)`，不需要额外权限；读取用 `clipboard.readText()`，需声明 `host.clipboard:read`。调用前分别检查 `capabilities.clipboardWrite` 和 `capabilities.clipboardRead`；旧宿主缺失能力位时按不支持处理。读取失败时应保留键盘粘贴等降级方式。必须依赖读取能力时声明 `engines.host_api: "^1.3"`。
 
 ### 持久化 UI 状态
 

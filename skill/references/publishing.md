@@ -241,6 +241,7 @@ node <skill-root>/scripts/make-candidate.mjs . --release-notes "Initial release.
 3. 下载候选包，重算 SHA-256 与 size，必须与审核值一致。
 4. 包内**没有 `signature.json`**（`Official signing accepts only unsigned candidates`）。
 5. 包内 `manifest.json` 的 `id`/`publisher`/`version` 与候选完全一致。
+6. 候选 `permissions`（若省略则使用已发布条目的权限）必须与包内 `manifest.json.permissions` 完全一致，顺序不影响比较；权限变化必须同步更新候选并递增版本。
 
 ### 签名后产出
 
@@ -355,6 +356,7 @@ https://raw.githubusercontent.com/t8y2/dbx-store/main/catalog/index.json
 | `Candidate size mismatch: expected <e>, got <a>` | 同上 |
 | `Official signing accepts only unsigned candidates` | 提交了已签名的包 |
 | `Expected plugin <id>, got <x>` / publisher / version | 候选与包内 manifest 身份不一致 |
+| `Candidate permissions do not match the package manifests` | 候选 `permissions` 与包内 `manifest.json.permissions` 不一致；更新权限时必须同时更新候选并递增版本 |
 | `preview signing key '<k>' cannot publish catalog artifacts` | 目录引用了 preview key |
 | `Binary plugin package must not be committed: <path>` | 仓库里有 `.dbxp` |
 | `Repository file exceeds 1 MiB: <path>` | 工作树里有大文件（含未跟踪文件） |

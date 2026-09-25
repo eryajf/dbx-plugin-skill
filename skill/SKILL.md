@@ -16,7 +16,7 @@ description: DBX 插件开发全流程。Use when 创建、开发、调试、打
 | --- | --- | --- |
 | Manifest v1 | `manifest.json` | 插件身份、权限、入口、贡献点、国际化。运行时契约，**拒绝未声明字段** |
 | 构建配置 | `dbx-plugin.toml` | 打包包含哪些目录、是否有原生后端、dev 构建命令。**不进入插件包** |
-| Host API 1.x | `window.dbxPlugin` / Sidecar callback | 沙箱 UI 与 DBX 宿主通信；Host API 1.1 支持 `host/requestUserInput`，Host API 1.2 增加估算执行计划 API，Host API 1.3 增加表结构元数据 API |
+| Host API 1.x | `window.dbxPlugin` / Sidecar callback | 沙箱 UI 与 DBX 宿主通信；Host API 1.1 支持 `host/requestUserInput`，Host API 1.2 增加估算执行计划 API，Host API 1.3 增加表结构元数据和剪贴板读取，Host API 1.4 增加用户授权的只读数据查询 |
 | Sidecar Protocol v1 | stdin/stdout JSON-RPC | 可选原生后端与 DBX 通信 |
 | 包格式 | `.dbxp`（ZIP 容器） | DBX 实际安装的东西 |
 
@@ -160,9 +160,9 @@ dbx-plugin package .
 - 已废弃字段会被 CLI 拒绝：`entrypoints.ui.kind`、`entrypoints.backend.binaries`、`entrypoints.backend.protocol`。
 
 **权限**
-- 只声明真正用到的权限，取最小集合：`host.workbench`、`host.events`、`host.filesystem`、`host.binary`、`host.plans:read`、`host.schema:read`、`host.storage`、`host.ai`、`host.network:https://host[:port]`（HTTPS、无路径/通配符/Token，最多 8 个）。`host.plans:read` 仅开放宿主生成的估算执行计划读取；`host.schema:read` 仅开放已打开连接中单个 table 的窄化结构元数据。
+- 只声明真正用到的权限，取最小集合：`host.workbench`、`host.events`、`host.filesystem`、`host.binary`、`host.plans:read`、`host.schema:read`、`host.storage`、`host.ai`、`host.clipboard:read`、`host.data:read`、`host.network:https://host[:port]`（HTTPS、无路径/通配符/Token，最多 8 个）。`host.plans:read` 仅开放宿主生成的估算执行计划读取；`host.schema:read` 仅开放已打开连接中单个 table 的窄化结构元数据；`host.data:read` 仅开放用户授权连接上的单条只读 SQL。
 - `host.network` 只影响浏览器 CSP 的 `connect-src`，**不是** Sidecar 的网络防火墙，也仍受目标服务 CORS 约束。
-- 估算执行计划 API 属于 Host API 1.2：需要 `host.plans:read`，并同时检查初始化能力 `capabilities.planApi` 与连接级支持；若插件无法在缺少该能力时工作，在 `engines.host_api` 声明 `^1.2`。工作台持久化小状态使用 `host.storage` 与 `window.dbxPlugin.storage`（单值 256 KiB、插件总量 1 MiB），并检查初始化能力 `capabilities.storage`。需要把数据快照交给 DBX 内置 AI 面板时声明 `host.ai`，调用 `window.dbxPlugin.ai.openConversation` 前检查 `capabilities.ai`；该 API 不返回模型输出，旧宿主缺少该能力时应优雅降级。
+- 估算执行计划 API 属于 Host API 1.2：需要 `host.plans:read`，并同时检查初始化能力 `capabilities.planApi` 与连接级支持；若插件无法在缺少该能力时工作，在 `engines.host_api` 声明 `^1.2`。表结构元数据与剪贴板读取属于 Host API 1.3；只读数据查询属于 Host API 1.4，需分别检查 `schemaMetadataApi`、`clipboardRead`、`dataApi`，并在无法降级时声明相应的 `engines.host_api` 下限。工作台持久化小状态使用 `host.storage` 与 `window.dbxPlugin.storage`（单值 256 KiB、插件总量 1 MiB），并检查初始化能力 `capabilities.storage`。需要把数据快照交给 DBX 内置 AI 面板时声明 `host.ai`，调用 `window.dbxPlugin.ai.openConversation` 前检查 `capabilities.ai`；该 API 不返回模型输出，旧宿主缺少该能力时应优雅降级。
 
 **安全**
 - 密码、Token、私钥**绝不**放进 `config`、Workbench context、事件或日志；需要持久化的敏感值用 `binding: "secret"`。
@@ -173,6 +173,7 @@ dbx-plugin package .
 - `.dbxp` 是安装包不是源码；不要把 `dist/` 当输入目录再次打包。
 - 打包会拒绝：符号链接、越界路径、`..`、`.dbx-dev`、超限文件、不安全输出位置。
 - 候选包**必须未签名**且 `.artifact.json` 里**不含 `signingKeyId`**；候选 URL 必须 HTTPS，且不能指向 `t8y2/dbx-store` 的 Release。
+- dbx-store 签名前会解包候选并逐项核对候选 `permissions` 与包内 `manifest.json.permissions`；新增或删除权限必须同时更新候选与包并递增版本。
 - 候选的 `id`/`version`/`publisher` 必须与包内 `manifest.json` 完全一致（签名时逐一比对）。
 - `plugins/*.json` 和 `catalog/index.json` **永远不要手工编辑**（由签名 Workflow 生成）。
 

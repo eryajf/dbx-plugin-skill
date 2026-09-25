@@ -34,7 +34,7 @@ const MANIFEST_TOP_FIELDS = [
   "localizations",
 ];
 
-const STATIC_PERMISSIONS = ["host.events", "host.binary", "host.workbench", "host.filesystem", "host.plans:read", "host.schema:read", "host.storage", "host.ai"];
+const STATIC_PERMISSIONS = ["host.events", "host.binary", "host.workbench", "host.filesystem", "host.plans:read", "host.schema:read", "host.storage", "host.ai", "host.clipboard:read", "host.data:read"];
 const NETWORK_PERMISSION = /^host\.network:https:\/\/[A-Za-z0-9._-]+(?::[0-9]+)?$/;
 const MAX_NETWORK_PERMISSIONS = 8;
 
@@ -417,11 +417,13 @@ function checkContributions(manifest, dir) {
     return;
   }
   const declared = new Set();
+  const workbenches = new Set();
   const usage = new Set();
   for (const contribution of manifest.contributions) {
     if (isPlainObject(contribution) && typeof contribution.id === "string") {
       if (declared.has(contribution.id)) error(`contributions 里 id 重复: ${contribution.id}`);
       declared.add(contribution.id);
+      if (contribution.type === "workbench") workbenches.add(contribution.id);
     }
   }
   manifest.contributions.forEach((contribution, index) => {
@@ -447,10 +449,13 @@ function checkContributions(manifest, dir) {
       error(`${at}.label 是必需的非空字符串`);
     }
     if (["workbench", "filesystem-provider", "context-menu", "result-view"].includes(type)) {
+      const allowed = type === "context-menu"
+        ? ["type", "id", "label", "description", "icon", "menu", "action"]
+        : ["type", "id", "label", "description", "icon"];
       const extra = Object.keys(contribution).filter(
-        (k) => !["type", "id", "label", "description", "icon"].includes(k),
+        (k) => !allowed.includes(k),
       );
-      if (type !== "filesystem-provider" && extra.length) {
+      if (type !== "filesystem-provider" && type !== "context-menu" && extra.length) {
         error(`${at} 含未知字段: ${extra.join(", ")}`);
       }
     }
@@ -463,8 +468,18 @@ function checkContributions(manifest, dir) {
         checkFilesystemProvider(contribution, at);
         break;
       case "context-menu":
-        if (contribution.menu !== "connection") {
-          error(`${at}.menu 必须是 "connection"（v1 仅支持该菜单）`);
+        if (!["connection", "table"].includes(contribution.menu)) {
+          error(`${at}.menu 必须是 "connection" 或 "table"`);
+        }
+        if (contribution.action !== undefined) {
+          const actionKeys = isPlainObject(contribution.action) ? Object.keys(contribution.action) : [];
+          if (!isPlainObject(contribution.action) || actionKeys.some((key) => !["type", "workbench"].includes(key)) || contribution.action.type !== "open-workbench" || typeof contribution.action.workbench !== "string") {
+            error(`${at}.action 必须是 { type: "open-workbench", workbench: "<id>" }`);
+          } else if (!workbenches.has(contribution.action.workbench)) {
+            error(`${at}.action.workbench 引用未声明的 workbench: ${contribution.action.workbench}`);
+          } else {
+            usage.add(contribution.action.workbench);
+          }
         }
         break;
       default:

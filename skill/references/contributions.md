@@ -7,12 +7,12 @@
 | `connection-provider` | `type`、`id`、`database_type`、`fields` | 声明连接表单与连接生命周期 |
 | `workbench` | `type`、`id`、`label` | 从侧边栏/插件入口打开的工作台 |
 | `filesystem-provider` | `type`、`id`、`label`、`schemes` | 接入 DBX 通用文件管理器 |
-| `context-menu` | `type`、`id`、`label`、`menu` | 连接右键菜单项（v1 仅 `connection`） |
+| `context-menu` | `type`、`id`、`label`、`menu` | Sidebar Tree 的连接或 table 右键菜单项，可选 Host 直接打开 Workbench |
 | `result-view` | `type`、`id`、`label` | 查询/任务结果的插件视图 |
 
 通用可选字段：`description`、`icon`（包内相对路径，缺失时回退到插件级 `icon`）。
 
-> 声明了贡献点**不等于**实现了业务逻辑。`filesystem-provider` 必须真的实现对应后端方法；`context-menu` 必须真的有后端。
+> 声明了贡献点**不等于**实现了业务逻辑。`filesystem-provider` 必须真的实现对应后端方法；未声明 `action` 的旧式 `context-menu` 必须真的有后端。插件快捷入口的显示位置由 DBX 插件中心设置管理，无需新增 Manifest 字段或后端协议。
 
 ---
 
@@ -234,10 +234,22 @@ SSH 作为最后一层时，路由是该跳板的动态 SOCKS5 端点；配置 S
 { "type": "context-menu", "id": "com.example.inspect", "label": "Inspect endpoint", "menu": "connection" }
 ```
 
-- `menu` 目前只能是 `"connection"`（已保存连接的侧边栏右键菜单）。
+- `menu` 为 `"connection"`（已保存连接）或 `"table"`（Sidebar Tree 中的表）。两者都由 DBX 原生渲染，不经过 iframe。
 - 由 DBX **原生渲染**（无 iframe，跟随原生主题与键盘行为）。
-- 点击后向后端发送 `contextMenu/<contribution-id>`，payload 是非敏感连接摘要 `{ id, dbType, name, database }`。
-- **必须有后端入口**。返回 `{ "message": "..." }` 会在界面上弹 toast。
+- 不声明 `action` 时，点击连接项向后端发送 `contextMenu/<contribution-id>`，payload 是非敏感连接摘要 `{ id, dbType, name, database }`；点击 table 项沿用同一方法并额外携带 `{ table: { connectionId, database?, schema?, table } }`。表上下文不含凭据、连接串或原始配置。
+- 可声明 Host 直接处理的 Workbench action，无需后端：
+
+```json
+{
+  "type": "context-menu",
+  "id": "com.example.open-table",
+  "label": "Open table",
+  "menu": "table",
+  "action": { "type": "open-workbench", "workbench": "com.example.main" }
+}
+```
+
+`action.workbench` 必须引用同一 Manifest 中的 `workbench` contribution。`connection` 菜单会把 `{ id, dbType, name, database }` 作为 Workbench context，`table` 菜单会把稳定的 TableContext 直接作为 context；两者均不含凭据。未声明 `action` 的旧式条目才要求后端，返回 `{ "message": "..." }` 会在界面上弹 toast。
 
 ---
 
@@ -249,7 +261,7 @@ SSH 作为最后一层时，路由是该跳板的动态 SOCKS5 端点；配置 S
 
 - 在结果网格旁加一个工具栏按钮；点击后用当前结果作为 context 打开**本插件的 workbench**（因此需要 UI 入口）。
 - `context.result` 是**有界快照**：`{ columns, rows (≤ 500), truncated }`，外加 `sql`、`connectionId`、`database`。
-- 需要完整/流式结果时，用 `sql` + 连接引用通过自己的后端重新执行查询。
+- 需要更多结果行时，可用 `sql` + 连接引用调用 Host API `queryData`，但必须声明 `host.data:read`，取得用户对该连接的授权，并遵守单条只读语句及 5000 行上限；详见 `host-api.md`。需要更大规模或流式读取时仍需自己的后端。
 
 ---
 

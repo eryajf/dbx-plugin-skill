@@ -14,6 +14,7 @@
  *   - release-candidates.json 的 artifacts[].url 必须是**纯 .dbxp 文件名**，不是 URL
  *   - 候选的 targets[].url 必须是 **HTTPS**
  *   - 候选不能含 signingKeyId / verified
+ *   - permissions 以 manifest.json 为准，并会与 .dbx-store.json 中的值比对
  *   - sha256 / size 必须与未签名包的**确切字节**一致
  */
 
@@ -202,6 +203,18 @@ function main() {
   } else {
     warn(`未找到 .dbx-store.json（首次上架需要 name 与 license）`);
   }
+
+  // The package manifest is authoritative for permissions. dbx-store's signing
+  // workflow compares candidate permissions with manifest.json, so stale
+  // .dbx-store.json metadata must not silently generate a mismatching candidate.
+  const manifestPermissions = Array.isArray(manifest.permissions) ? [...new Set(manifest.permissions)].sort() : [];
+  if (storeFields.permissions !== undefined) {
+    const metadataPermissions = Array.isArray(storeFields.permissions) ? [...new Set(storeFields.permissions)].sort() : null;
+    if (!metadataPermissions || JSON.stringify(metadataPermissions) !== JSON.stringify(manifestPermissions)) {
+      error(`.dbx-store.json 的 permissions 必须与 manifest.json.permissions 一致（以 manifest 为准）`);
+    }
+  }
+  storeFields.permissions = manifestPermissions;
 
   // 收集 artifact.json
   const artifactFiles = readdirSync(distDir)
