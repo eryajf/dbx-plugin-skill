@@ -151,6 +151,7 @@ node <skill-root>/scripts/dev-logs.mjs --port 5190 --level error --follow
 
 - `host.openFilesystem` 等未实现方法**直接返回错误**。
 - 原生连接动作（connection actions）、query-result 贡献点、完整 DBX 组件 kit **不模拟**。
+- `host.ai` 的对话和推荐请求只做权限与参数校验，不会在开发壳中运行真实模型或 Agent 工具；推荐与 AI 面板行为要在真实 DBX 中复验。
 - 安装、签名、真实 Secret Store、桌面端生命周期、生产权限**不模拟**。
 - 不读取 DBX 用户 profile，不模拟 Keychain / 桌面端 Tab 恢复。
 - 不启用直接的插件 UI 网络访问。

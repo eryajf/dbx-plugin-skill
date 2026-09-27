@@ -91,6 +91,8 @@ dbx-plugin create my-plugin \
 | `rust` | `frontend` 的基础文件换成 `common/*`，另加 `backend/Cargo.toml`、`backend/src/main.rs` |
 | `go` | 同上，另加 `backend/go.mod`、`backend/main.go` |
 
+当前 CLI 模板默认声明可选的 `host.ai`，并在 Workbench 中放入一条 `ai.recommendations` 示例；如果插件不需要 AI 能力，应删除权限和对应推荐配置，并保留旧宿主降级逻辑。
+
 生成的 `.gitignore` 已包含 `/dist/`、`/.dbx-dev/`、`.dbx-repository-signing-key.env`。生成的 Release workflow 会固定到与 CLI 相同的 `plugin-cli-v<version>` tag，并把同一版本传给 `plugin-cli-version`；不要把 reusable workflow 改成跟随 `main`。
 
 ### create 的校验规则

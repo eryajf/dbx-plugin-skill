@@ -24,7 +24,7 @@
 | `engines` | **是** | 至少含 `host_api`，见 §2 |
 | `permissions` | 否 | 见 §2 |
 | `entrypoints` | 否 | 有贡献点/后端时按需声明，见 §3 |
-| `contributions` | 否 | 见 `contributions.md` |
+| `contributions` | 否 | 见 `contributions.md`；当前类型包括 `connection-provider`、`workbench`、`filesystem-provider`、`context-menu`、`result-view`、`command`、`menus` |
 | `localizations` | 否 | 见 §5 |
 
 **因未知字段被拒的典型**：手写 `signingKeyId`（属于商店 artifact metadata，不是 Manifest 字段）、`verified`、`author`、`license`、`repository` 等自造键。
@@ -145,7 +145,13 @@ CLI 打包还会校验：`icon` / `ui.entry` 指向的文件必须存在，且**
 - DBX 匹配顺序：精确 locale → 基础语言 → manifest 默认文案。
 - **它不翻译插件 UI 自己的文本**，UI 文案要按 `window.dbxPlugin.locale` 自行处理。
 
-## 6. 最小可用示例
+## 6. Workbench AI 推荐与新增贡献点
+
+`workbench` contribution 可增加 `ai.recommendations`（最多 5 项），每项必需 `id`、`label`、`prompt`，可选整数 `order`。推荐文本支持从当前 Workbench context 读取的 `{{resource.name}}` 等路径；无法解析的路径以及 `__proto__`、`prototype`、`constructor` 会被拒绝或隐藏。运行时可用 `ai.setRecommendations({ context, items })` 替换默认项，用 `ai.clearRecommendations()` 清空；需声明 `host.ai` 并检查 `capabilities.aiRecommendations`。
+
+Manifest v1 还支持 `command` 与 `menus` contribution：命令当前通过 `action: { type: "open-workbench", workbench, presentation?, context? }` 打开同插件工作台；菜单项通过 `location`（`commandPalette`、`appToolbar`、`appSidebar`）、`command`、`group`、`order` 放置命令，可选 `default_visible` 和 `when`。具体示例与引用规则见 `contributions.md`。
+
+## 7. 最小可用示例
 
 ```json
 {
@@ -173,7 +179,7 @@ CLI 打包还会校验：`icon` / `ui.entry` 指向的文件必须存在，且**
 }
 ```
 
-## 7. 带原生后端的完整示例
+## 8. 带原生后端的完整示例
 
 ```json
 {
@@ -220,7 +226,7 @@ CLI 打包还会校验：`icon` / `ui.entry` 指向的文件必须存在，且**
 }
 ```
 
-## 8. CLI 与 Schema 的差异（容易踩）
+## 9. CLI 与 Schema 的差异（容易踩）
 
 | 项 | Schema / 运行时 | CLI `package` |
 | --- | --- | --- |
@@ -232,7 +238,7 @@ CLI 打包还会校验：`icon` / `ui.entry` 指向的文件必须存在，且**
 | 未知字段 | `additionalProperties: false` | 打包时显式拒绝并列出字段名 |
 | `executable` | 按声明 | **改写为 `bin/<target>/<binary>`** |
 
-## 9. 自检
+## 10. 自检
 
 ```bash
 node <skill-root>/scripts/check-project.mjs <项目目录>

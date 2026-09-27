@@ -1,6 +1,6 @@
 ---
 name: dbx-plugin
-description: DBX 插件开发全流程。Use when 创建、开发、调试、打包、签名、发布或上架 DBX 插件；处理 manifest.json、dbx-plugin.toml、.dbxp 包、贡献点（connection-provider / proxy_route / workbench / filesystem-provider / context-menu / result-view）、Host API（window.dbxPlugin 桥接）、Rust/Go Sidecar 协议、dbx-plugin CLI（create / dev / package / keygen）、dbx-store 候选 PR 与 catalog 校验时使用。
+description: DBX 插件开发全流程。Use when 创建、开发、调试、打包、签名、发布或上架 DBX 插件；处理 manifest.json、dbx-plugin.toml、.dbxp 包、贡献点（connection-provider / proxy_route / workbench / filesystem-provider / context-menu / result-view / command / menus）、Host API（window.dbxPlugin 桥接）、Rust/Go Sidecar 协议、dbx-plugin CLI（create / dev / package / keygen）、dbx-store 候选 PR 与 catalog 校验时使用。
 ---
 
 # DBX 插件开发
@@ -60,7 +60,7 @@ SDK **不需要启动**：没有常驻 SDK Server。开发时只用三类工具�
 | 任务 | 读 |
 | --- | --- |
 | 写/改 `manifest.json`、权限、入口、`localizations` | `references/manifest.md` |
-| 加连接表单、工作台、文件系统、右键菜单、结果视图 | `references/contributions.md` |
+| 加连接表单、工作台、文件系统、右键菜单、结果视图、命令和菜单 | `references/contributions.md` |
 | 写沙箱 UI、调 `window.dbxPlugin`、主题适配、CSP/网络 | `references/host-api.md` |
 | 写 Rust/Go Sidecar、连接生命周期、二进制帧 | `references/sidecar-protocol.md` |
 | 用 `dbx-plugin` 命令、装 CLI、模板选择 | `references/cli.md` |
@@ -105,6 +105,7 @@ dbx-plugin create my-plugin \
 - 需要原生能力（S3/SSH/系统凭据/长连接/高性能）才写 Sidecar。Sidecar 不是 OS 沙箱，以当前用户权限运行。
 - 连接表单可用 `visible_when` / `required_when` 的 `all_of`、`any_of`、`not` 组合条件，以及 `picker` 提供本地文件选择；依赖这些能力时设置足够新的 `engines.dbx`。
 - 若握手可能超过通用超时，连接表单可声明 `config` 字段 `connect_timeout_secs`；DBX 会用其解析值作为 `connection/test` 与 `connection/connect` 的 deadline。需要访问 Kafka `advertised.listeners` 或集群发现等多端点协议时，在 connection-provider 上声明 `proxy_route: true`，通过生命周期请求的 `runtime.proxy` SOCKS5 路由连接广播端点。Sidecar 进程按插件共享、跨标签页复用，后端会话应按 `connection.id` 管理。
+- 工作台可声明 `ai.recommendations`，`command` 和 `menus` 可把同插件工作台放入命令面板、应用工具栏或侧边栏；这些入口必须引用已声明的贡献点，并按运行时 capability 做降级。
 
 ### 步骤 3：本地调试
 
@@ -158,11 +159,13 @@ dbx-plugin package .
 - 包内路径相对包根，**不能**以 `/` 开头、不能含 `..`、反斜杠或重复斜杠。
 - `entrypoints.ui.entry` 必须位于 `ui.root` 内。
 - 已废弃字段会被 CLI 拒绝：`entrypoints.ui.kind`、`entrypoints.backend.binaries`、`entrypoints.backend.protocol`。
+- `command` 贡献点的 `action.workbench` 必须引用同一 Manifest 中的 `workbench`；`menus.items[].command` 应引用已声明的命令，位置只能是 `commandPalette`、`appToolbar` 或 `appSidebar`。
 
 **权限**
 - 只声明真正用到的权限，取最小集合：`host.workbench`、`host.events`、`host.filesystem`、`host.binary`、`host.plans:read`、`host.schema:read`、`host.storage`、`host.ai`、`host.clipboard:read`、`host.data:read`、`host.network:https://host[:port]`（HTTPS、无路径/通配符/Token，最多 8 个）。`host.plans:read` 仅开放宿主生成的估算执行计划读取；`host.schema:read` 仅开放已打开连接中单个 table 的窄化结构元数据；`host.data:read` 仅开放用户授权连接上的单条只读 SQL。
 - `host.network` 只影响浏览器 CSP 的 `connect-src`，**不是** Sidecar 的网络防火墙，也仍受目标服务 CORS 约束。
 - 估算执行计划 API 属于 Host API 1.2：需要 `host.plans:read`，并同时检查初始化能力 `capabilities.planApi` 与连接级支持；若插件无法在缺少该能力时工作，在 `engines.host_api` 声明 `^1.2`。表结构元数据与剪贴板读取属于 Host API 1.3；只读数据查询属于 Host API 1.4，需分别检查 `schemaMetadataApi`、`clipboardRead`、`dataApi`，并在无法降级时声明相应的 `engines.host_api` 下限。工作台持久化小状态使用 `host.storage` 与 `window.dbxPlugin.storage`（单值 256 KiB、插件总量 1 MiB），并检查初始化能力 `capabilities.storage`。需要把数据快照交给 DBX 内置 AI 面板时声明 `host.ai`，调用 `window.dbxPlugin.ai.openConversation` 前检查 `capabilities.ai`；该 API 不返回模型输出，旧宿主缺少该能力时应优雅降级。
+- Workbench 的 `ai.recommendations` 最多 5 条；运行时用 `ai.setRecommendations` 覆盖默认项或用 `ai.clearRecommendations` 清空。`label` / `prompt` 支持从 context 读取的 `{{path.to.value}}` 占位符，无法解析或包含原型污染路径的推荐会被隐藏；调用前检查 `capabilities.aiRecommendations`。
 
 **安全**
 - 密码、Token、私钥**绝不**放进 `config`、Workbench context、事件或日志；需要持久化的敏感值用 `binding: "secret"`。

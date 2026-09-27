@@ -25,6 +25,7 @@ const locale = window.dbxPlugin.locale;
 | `onContext(fn)` | 监听 context 变化，返回取消订阅函数 | — |
 | `locale` | 当前语言（`en`、`zh-CN` 等） | — |
 | `theme` | `{ appearance: "light" \| "dark", tokens }` | — |
+| `capabilities` | 初始化消息公布的 `planApi`、`schemaMetadataApi`、`dataApi`、`storage`、`ai`、`aiRecommendations`、剪贴板等能力位 | — |
 | `request(method, params)` | 调用 **Host API** | — |
 | `invoke(method, params, { timeoutMs })` | 调用**自己 Sidecar** 的 RPC（有响应） | — |
 | `notify(method, params)` | 向自己 Sidecar 发通知（无业务返回值） | — |
@@ -40,7 +41,8 @@ const locale = window.dbxPlugin.locale;
 | `copy(text)` / `clipboard.writeText(text)` | 写入系统剪贴板 | — |
 | `clipboard.readText()` | 读取系统剪贴板 | `host.clipboard:read` |
 | `storage.get(key)` / `storage.set(key, value)` / `storage.delete(key)` | 持久化本插件工作台的小型 JSON 状态 | `host.storage` |
-| `ai.openConversation({ title, prompt, context, send? })` | 在 DBX 内置 AI 面板创建带快照的插件对话；`send` 默认 `false` | `host.ai` |
+| `ai.openConversation({ title, prompt, context, send?, mode? })` | 在 DBX 内置 AI 面板创建插件对话；`mode` 默认 `ask`，可选 `agent` 使用当前连接的插件工具 | `host.ai` |
+| `ai.setRecommendations({ context, items })` / `ai.clearRecommendations()` | 更新或清空当前 Workbench 的全局 AI 推荐问题（最多 5 条） | `host.ai` + `capabilities.aiRecommendations` |
 | `fileTransfer` | 桌面端经用户明确同意后的本地文件选择、保存和系统拖放流；Web 宿主通常不提供 | — |
 | `onInit(fn)` | 监听初始化/环境变化 | — |
 | `onEvent(fn)` | 监听后端事件 | `host.events` |
@@ -113,7 +115,7 @@ if (window.dbxPlugin.capabilities.storage) {
 
 ### 在 DBX AI 中分析插件数据
 
-声明 `host.ai` 后，插件可以把当前数据的 JSON 快照交给内置 AI 面板：
+声明 `host.ai` 后，插件可以把当前数据的 JSON 快照交给内置 AI 面板，也可以为当前 Workbench 提供推荐问题：
 
 ```js
 await window.dbxPlugin.ready;
@@ -122,12 +124,32 @@ if (window.dbxPlugin.capabilities.ai) {
     title: "分析结果",
     prompt: "请找出异常并解释原因。",
     context: { rows, source: "example", fetchedAt: new Date().toISOString() },
+    mode: "ask",
     send: true,
   });
 }
 ```
 
-`title` 最多 200 字符，`prompt` 最多 32000 字符，`context` 必须是 JSON 对象且不超过 2 MiB。宿主保存快照作为会话历史，不向插件返回模型回复或模型配置；未配置模型时由用户在 DBX 面板中选择。旧宿主不广播 `capabilities.ai` 时应隐藏入口，不要用请求试探。
+`title` 最多 200 字符，`prompt` 最多 32000 字符，`context` 必须是 JSON 对象且不超过 2 MiB。`mode` 默认为 `ask`；设为 `agent` 时，宿主可通过当前已打开的插件连接提供实时 Sidecar 工具。宿主保存快照作为会话历史，不向插件返回模型回复或模型配置；未配置模型时由用户在 DBX 面板中选择。旧宿主不广播 `capabilities.ai` 时应隐藏入口，不要用请求试探。
+
+Workbench 默认推荐项写在 Manifest 的 `workbench.ai.recommendations` 中；资源切换时可运行时替换：
+
+```js
+if (dbxPlugin.capabilities.aiRecommendations) {
+  await dbxPlugin.ai.setRecommendations({
+    context: { resource },
+    items: [
+      { id: "health", label: "检查 {{resource.name}}", prompt: "分析 {{resource.kind}}/{{resource.name}} 的健康状态", order: 10 },
+    ],
+  });
+} else {
+  // 旧宿主没有推荐能力时隐藏入口
+}
+
+await dbxPlugin.ai.clearRecommendations();
+```
+
+`items` 最多 5 条；`label` 最多 200 字符，`prompt` 最多 32000 字符。`{{path.to.value}}` 支持对象属性和数组下标，无法解析的路径会隐藏推荐，`__proto__`、`prototype`、`constructor` 等路径会被拒绝。运行时 context 会与当前 Workbench 的 `connectionId` 等绑定信息合并，点击推荐后由 DBX 创建新的 Agent 对话并立即发送。插件不会收到模型输出。
 
 ### 桌面文件传输与系统拖放
 

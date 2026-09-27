@@ -9,6 +9,8 @@
 | `filesystem-provider` | `type`、`id`、`label`、`schemes` | 接入 DBX 通用文件管理器 |
 | `context-menu` | `type`、`id`、`label`、`menu` | Sidebar Tree 的连接或 table 右键菜单项，可选 Host 直接打开 Workbench |
 | `result-view` | `type`、`id`、`label` | 查询/任务结果的插件视图 |
+| `command` | `type`、`id`、`label`、`action` | 可被命令面板、应用工具栏或侧边栏菜单调用的命令 |
+| `menus` | `type`、`id` | 把命令放入 `commandPalette`、`appToolbar` 或 `appSidebar` |
 
 通用可选字段：`description`、`icon`（包内相对路径，缺失时回退到插件级 `icon`）。
 
@@ -172,7 +174,61 @@ SSH 作为最后一层时，路由是该跳板的动态 SOCKS5 端点；配置 S
 
 ---
 
-## 4. `filesystem-provider`
+### Workbench 的 AI 推荐问题
+
+在 `workbench` 下可选声明 `ai.recommendations`，最多 5 条。`label` 显示在 DBX 全局 AI 面板，`prompt` 是点击后发送的文本，`order` 越小越靠前；`label` 和 `prompt` 支持从当前 Workbench context 读取的 `{{resource.name}}`、`{{items.0.status}}` 占位符。无法解析的占位符或包含 `__proto__`、`prototype`、`constructor` 的路径会隐藏该推荐。
+
+```json
+{
+  "type": "workbench",
+  "id": "com.example.files.main",
+  "label": "Files",
+  "ai": {
+    "recommendations": [
+      { "id": "health", "label": "检查 {{resource.name}}", "prompt": "分析 {{resource.kind}}/{{resource.name}} 的健康状态", "order": 10 }
+    ]
+  }
+}
+```
+
+运行时可调用 `dbxPlugin.ai.setRecommendations({ context, items })` 替换默认项，或调用 `clearRecommendations()` 清空。两者都需要 `host.ai` 与 `capabilities.aiRecommendations`；宿主会保留当前 Workbench 的连接绑定。
+
+## 4. `command` 与 `menus`
+
+`command` 声明可执行动作；当前动作类型是由 Host 直接打开同插件 Workbench 的 `open-workbench`。`action.workbench` 必须引用同一 Manifest 中的 `workbench`，可选 `presentation` 为 `tab` 或 `panel`，可传 JSON `context`。
+
+```json
+{
+  "type": "command",
+  "id": "com.example.files.open",
+  "label": "打开文件工作台",
+  "action": {
+    "type": "open-workbench",
+    "workbench": "com.example.files.main",
+    "presentation": "tab",
+    "context": { "path": "/" }
+  }
+}
+```
+
+`enablement` 可声明命令可用条件，由宿主决定当前上下文是否可执行。插件不应假设不兼容的 DBX 版本会显示该命令。
+
+`menus` 把命令放入宿主 UI；`items` 每项必须有 `location`、`command`、`group` 和整数 `order`，位置只能是 `commandPalette`、`appToolbar`、`appSidebar`，可选 `default_visible` 和 `when`：
+
+```json
+{
+  "type": "menus",
+  "id": "com.example.files.menus",
+  "items": [
+    { "location": "commandPalette", "command": "com.example.files.open", "group": "navigation", "order": 10 },
+    { "location": "appToolbar", "command": "com.example.files.open", "group": "navigation", "order": 10, "default_visible": true }
+  ]
+}
+```
+
+快捷入口的显示位置、排序和插件级隐藏开关由 **插件中心 → 设置 → 全局配置** 管理；`appToolbar` 的可见条件和命令 enablement 会被保留。位置只影响图标位置，不会关闭已经打开的 Workbench 会话。
+
+## 5. `filesystem-provider`
 
 让 DBX 通用文件管理器接管浏览/分页/预览，插件只实现存储协议。
 
@@ -228,7 +284,7 @@ SSH 作为最后一层时，路由是该跳板的动态 SOCKS5 端点；配置 S
 
 ---
 
-## 5. `context-menu`
+## 6. `context-menu`
 
 ```json
 { "type": "context-menu", "id": "com.example.inspect", "label": "Inspect endpoint", "menu": "connection" }
@@ -253,7 +309,7 @@ SSH 作为最后一层时，路由是该跳板的动态 SOCKS5 端点；配置 S
 
 ---
 
-## 6. `result-view`
+## 7. `result-view`
 
 ```json
 { "type": "result-view", "id": "com.example.graph", "label": "Graph" }
@@ -265,7 +321,7 @@ SSH 作为最后一层时，路由是该跳板的动态 SOCKS5 端点；配置 S
 
 ---
 
-## 7. 组合与引用规则
+## 8. 组合与引用规则
 
 - 同一插件内通过 `id` 互相引用：Connection Provider 的 `workbench` 必须指向已声明的 workbench；`filesystem_provider` 必须指向已声明的 filesystem-provider。悬空引用会在运行时校验失败。
 - 图标优先级：Contribution 的 `icon` → 插件级 `icon` → DBX 内置通用图标。
@@ -273,7 +329,7 @@ SSH 作为最后一层时，路由是该跳板的动态 SOCKS5 端点；配置 S
 
 ---
 
-## 8. 常见错误
+## 9. 常见错误
 
 | 现象 | 原因 |
 | --- | --- |

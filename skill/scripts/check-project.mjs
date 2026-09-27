@@ -48,12 +48,15 @@ const CAPABILITIES = ["test", "connect", "disconnect"];
 const ACTION_VARIANTS = ["default", "outline", "secondary", "destructive", "ghost"];
 const ACTION_WHEN = ["always", "create", "edit"];
 const FS_CAPABILITIES = ["read", "write", "delete", "rename", "mkdir"];
+const COMMAND_LOCATIONS = ["commandPalette", "appToolbar", "appSidebar"];
 const CONTRIBUTION_TYPES = [
   "connection-provider",
   "workbench",
   "filesystem-provider",
   "context-menu",
   "result-view",
+  "command",
+  "menus",
 ];
 
 // ---------------------------------------------------------------- 输出
@@ -418,12 +421,14 @@ function checkContributions(manifest, dir) {
   }
   const declared = new Set();
   const workbenches = new Set();
+  const commands = new Set();
   const usage = new Set();
   for (const contribution of manifest.contributions) {
     if (isPlainObject(contribution) && typeof contribution.id === "string") {
       if (declared.has(contribution.id)) error(`contributions 里 id 重复: ${contribution.id}`);
       declared.add(contribution.id);
       if (contribution.type === "workbench") workbenches.add(contribution.id);
+      if (contribution.type === "command") commands.add(contribution.id);
     }
   }
   manifest.contributions.forEach((contribution, index) => {
@@ -445,13 +450,19 @@ function checkContributions(manifest, dir) {
       if (reason) error(`${at}.icon 路径不安全: ${reason}`);
       else if (!state.files.has(contribution.icon)) error(`${at}.icon "${contribution.icon}" 不存在`);
     }
-    if (contribution.type !== "connection-provider" && (typeof contribution.label !== "string" || contribution.label === "")) {
+    if (!['connection-provider', 'menus'].includes(contribution.type) && (typeof contribution.label !== "string" || contribution.label === "")) {
       error(`${at}.label 是必需的非空字符串`);
     }
-    if (["workbench", "filesystem-provider", "context-menu", "result-view"].includes(type)) {
+    if (["workbench", "filesystem-provider", "context-menu", "result-view", "command", "menus"].includes(type)) {
       const allowed = type === "context-menu"
         ? ["type", "id", "label", "description", "icon", "menu", "action"]
-        : ["type", "id", "label", "description", "icon"];
+        : type === "workbench"
+          ? ["type", "id", "label", "description", "icon", "ai"]
+          : type === "command"
+            ? ["type", "id", "label", "description", "icon", "action", "enablement"]
+            : type === "menus"
+              ? ["type", "id", "items"]
+              : ["type", "id", "label", "description", "icon"];
       const extra = Object.keys(contribution).filter(
         (k) => !allowed.includes(k),
       );
@@ -482,6 +493,15 @@ function checkContributions(manifest, dir) {
           }
         }
         break;
+      case "workbench":
+        checkWorkbenchAi(contribution, at);
+        break;
+      case "command":
+        checkCommand(contribution, at, workbenches, usage);
+        break;
+      case "menus":
+        checkMenus(contribution, at, commands);
+        break;
       default:
         break;
     }
@@ -492,6 +512,86 @@ function checkContributions(manifest, dir) {
       error(`贡献点引用 "${ref}" 但未在本插件声明`, "引用的 workbench / filesystem-provider 必须有对应的 contributions 条目。");
     }
   }
+}
+
+function checkWorkbenchAi(contribution, at) {
+  if (contribution.ai === undefined) return;
+  if (!isPlainObject(contribution.ai)) {
+    error(`${at}.ai 必须是对象`);
+    return;
+  }
+  const extra = Object.keys(contribution.ai).filter((key) => key !== "recommendations");
+  if (extra.length) error(`${at}.ai 含未知字段: ${extra.join(", ")}`);
+  const recommendations = contribution.ai.recommendations;
+  if (recommendations === undefined) return;
+  if (!Array.isArray(recommendations) || recommendations.length > 5) {
+    error(`${at}.ai.recommendations 必须是最多 5 项的数组`);
+    return;
+  }
+  const ids = new Set();
+  recommendations.forEach((item, index) => {
+    const iAt = `${at}.ai.recommendations[${index}]`;
+    if (!isPlainObject(item)) {
+      error(`${iAt} 必须是对象`);
+      return;
+    }
+    const extraItem = Object.keys(item).filter((key) => !["id", "label", "prompt", "order"].includes(key));
+    if (extraItem.length) error(`${iAt} 含未知字段: ${extraItem.join(", ")}`);
+    if (typeof item.id !== "string" || !IDENTIFIER.test(item.id)) error(`${iAt}.id 非法`);
+    else if (ids.has(item.id)) error(`${iAt}.id 重复`);
+    else ids.add(item.id);
+    if (typeof item.label !== "string" || item.label.length === 0 || item.label.length > 200) error(`${iAt}.label 必须是 1–200 字符的非空字符串`);
+    if (typeof item.prompt !== "string" || item.prompt.length === 0 || item.prompt.length > 32000) error(`${iAt}.prompt 必须是 1–32000 字符的非空字符串`);
+    if (item.order !== undefined && (!Number.isInteger(item.order) || item.order < -2147483648 || item.order > 2147483647)) error(`${iAt}.order 必须是 32 位整数`);
+    for (const field of ["label", "prompt"]) {
+      if (typeof item[field] === "string" && /{{\s*(?:__proto__|prototype|constructor)(?:\.|\s*}})/.test(item[field])) {
+        error(`${iAt}.${field} 不允许使用原型污染路径`);
+      }
+    }
+  });
+}
+
+function checkCommand(contribution, at, workbenches, usage) {
+  if (!isPlainObject(contribution.action)) {
+    error(`${at}.action 必须是对象`);
+  } else {
+    const action = contribution.action;
+    if (action.type !== "open-workbench" || typeof action.workbench !== "string") {
+      error(`${at}.action 必须是 { type: "open-workbench", workbench: "<id>" }`);
+    } else {
+      if (!workbenches.has(action.workbench)) error(`${at}.action.workbench 引用未声明的 workbench: ${action.workbench}`);
+      else usage.add(action.workbench);
+    }
+    const extra = Object.keys(action).filter((key) => !["type", "workbench", "presentation", "context"].includes(key));
+    if (extra.length) error(`${at}.action 含未知字段: ${extra.join(", ")}`);
+    if (action.presentation !== undefined && !["tab", "panel"].includes(action.presentation)) error(`${at}.action.presentation 必须是 tab 或 panel`);
+    if (action.context !== undefined && !isPlainObject(action.context)) error(`${at}.action.context 必须是对象`);
+  }
+  if (contribution.enablement !== undefined && !isPlainObject(contribution.enablement)) error(`${at}.enablement 必须是对象`);
+}
+
+function checkMenus(contribution, at, commands) {
+  if (contribution.items === undefined) return;
+  if (!Array.isArray(contribution.items)) {
+    error(`${at}.items 必须是数组`);
+    return;
+  }
+  contribution.items.forEach((item, index) => {
+    const iAt = `${at}.items[${index}]`;
+    if (!isPlainObject(item)) {
+      error(`${iAt} 必须是对象`);
+      return;
+    }
+    const extra = Object.keys(item).filter((key) => !["location", "command", "group", "order", "default_visible", "when"].includes(key));
+    if (extra.length) error(`${iAt} 含未知字段: ${extra.join(", ")}`);
+    if (!COMMAND_LOCATIONS.includes(item.location)) error(`${iAt}.location 必须是 ${COMMAND_LOCATIONS.join(" / ")}`);
+    if (typeof item.command !== "string" || item.command.length === 0) error(`${iAt}.command 必须是非空字符串`);
+    else if (!commands.has(item.command)) warn(`${iAt}.command 未引用本 Manifest 中声明的 command: ${item.command}`);
+    if (typeof item.group !== "string") error(`${iAt}.group 必须是字符串`);
+    if (!Number.isInteger(item.order)) error(`${iAt}.order 必须是整数`);
+    if (item.default_visible !== undefined && typeof item.default_visible !== "boolean") error(`${iAt}.default_visible 必须是布尔值`);
+    if (item.when !== undefined && !isPlainObject(item.when)) error(`${iAt}.when 必须是对象`);
+  });
 }
 
 function checkConnectionProvider(contribution, at, declared, usage) {
