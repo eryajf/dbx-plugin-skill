@@ -291,6 +291,31 @@ const goodManifest = makeProject({ dir: goodDir });
   check("--json 输出可解析的 JSON", parsed !== null && parsed.ok === true, result.stdout.slice(0, 200));
 }
 
+const mcpDir = join(work, "mcp");
+mkdirSync(join(mcpDir, "bin", "darwin-arm64"), { recursive: true });
+mkdirSync(join(mcpDir, "backend"), { recursive: true });
+const mcpManifest = makeProject({ dir: mcpDir });
+mcpManifest.entrypoints.backend = { executable: "bin/darwin-arm64/backend" };
+mcpManifest.contributions.push({ type: "mcp", id: "com.example.demo.mcp", external_tools: true });
+writeFileSync(join(mcpDir, "manifest.json"), `${JSON.stringify(mcpManifest, null, 2)}\n`);
+writeFileSync(join(mcpDir, "bin", "darwin-arm64", "backend"), "#!/bin/sh\n");
+writeFileSync(join(mcpDir, "backend", "go.mod"), "module example.com/backend\n\ngo 1.22\n");
+writeFileSync(join(mcpDir, "dbx-plugin.toml"), `schema_version = 1\n\n[package]\ninclude = ["assets", "ui", "bin", "backend"]\n\n[backend]\nlanguage = "go"\ndirectory = "backend"\nbinary = "backend"\n`);
+{
+  const result = run([join(scripts, "check-project.mjs"), mcpDir, "--json"]);
+  const parsed = JSON.parse(result.stdout);
+  check("合法 mcp contribution 通过预检", result.status === 0, result.stdout.slice(0, 500));
+  check("mcp contribution 不要求 label", parsed.ok === true);
+}
+{
+  const invalidMcp = { ...mcpManifest, contributions: [...mcpManifest.contributions, { type: "mcp", id: "com.example.demo.mcp2", ai_tools: "yes" }] };
+  writeFileSync(join(mcpDir, "manifest.json"), `${JSON.stringify(invalidMcp, null, 2)}\n`);
+  const result = run([join(scripts, "check-project.mjs"), mcpDir, "--json"]);
+  const parsed = JSON.parse(result.stdout);
+  const messages = parsed.findings.map((f) => f.message).join("\n");
+  check("mcp contribution 重复或类型错误被拒绝", result.status === 1 && messages.includes("最多声明一个 mcp") && messages.includes("ai_tools 必须是布尔值"), messages);
+}
+
 const badDir = join(work, "bad");
 mkdirSync(join(badDir, "ui"), { recursive: true });
 writeFileSync(join(badDir, "manifest.json"), `${JSON.stringify({

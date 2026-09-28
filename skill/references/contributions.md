@@ -11,8 +11,9 @@
 | `result-view` | `type`、`id`、`label` | 查询/任务结果的插件视图 |
 | `command` | `type`、`id`、`label`、`action` | 可被命令面板、应用工具栏或侧边栏菜单调用的命令 |
 | `menus` | `type`、`id` | 把命令放入 `commandPalette`、`appToolbar` 或 `appSidebar` |
+| `mcp` | `type`、`id` | 声明 Sidecar MCP 工具进入内置 AI 与外部 `dbx` MCP 服务的暴露面 |
 
-通用可选字段：`description`、`icon`（包内相对路径，缺失时回退到插件级 `icon`）。
+通用可选字段：`description`、`icon`（包内相对路径，缺失时回退到插件级 `icon`）；`mcp` 是例外，不接受 `label` 或 `icon`。
 
 > 声明了贡献点**不等于**实现了业务逻辑。`filesystem-provider` 必须真的实现对应后端方法；未声明 `action` 的旧式 `context-menu` 必须真的有后端。插件快捷入口的显示位置由 DBX 插件中心设置管理，无需新增 Manifest 字段或后端协议。
 
@@ -319,9 +320,29 @@ SSH 作为最后一层时，路由是该跳板的动态 SOCKS5 端点；配置 S
 - `context.result` 是**有界快照**：`{ columns, rows (≤ 500), truncated }`，外加 `sql`、`connectionId`、`database`。
 - 需要更多结果行时，可用 `sql` + 连接引用调用 Host API `queryData`，但必须声明 `host.data:read`，取得用户对该连接的授权，并遵守单条只读语句及 5000 行上限；详见 `host-api.md`。需要更大规模或流式读取时仍需自己的后端。
 
+## 8. `mcp`
+
+当原生后端实现 `mcp/tools` 与 `mcp/call` 时，用 `mcp` contribution 声明工具应出现在哪些面：
+
+```json
+{
+  "type": "mcp",
+  "id": "vendor.ssh.mcp",
+  "description": "Terminal and file tools over SSH connections.",
+  "ai_tools": true,
+  "external_tools": true
+}
+```
+
+- 只要求 `type` 和 `id`；`description` 可选。
+- `ai_tools` 默认 `true`；设为 `false` 时，即使用户在插件中心开启该插件，也不会进入 DBX 内置 AI Agent。
+- `external_tools` 默认 `false`；设为 `true` 才会进入外部 `dbx` MCP 服务，并继续受全局 MCP 工具白名单和连接白名单约束。
+- 每个 Manifest 最多一个 `mcp` contribution，且必须声明 `entrypoints.backend`。声明该类型会让旧版宿主无法读取 Manifest；需要兼容旧宿主时不要声明它。
+- 运行时安全门不因 Manifest 声明而放宽：仅当前打开的插件连接可用，非 `annotations.readOnlyHint: true` 的调用仍需逐次确认，插件中心开关始终可以关闭 AI 工具。
+
 ---
 
-## 8. 组合与引用规则
+## 9. 组合与引用规则
 
 - 同一插件内通过 `id` 互相引用：Connection Provider 的 `workbench` 必须指向已声明的 workbench；`filesystem_provider` 必须指向已声明的 filesystem-provider。悬空引用会在运行时校验失败。
 - 图标优先级：Contribution 的 `icon` → 插件级 `icon` → DBX 内置通用图标。

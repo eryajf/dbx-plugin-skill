@@ -57,6 +57,7 @@ const CONTRIBUTION_TYPES = [
   "result-view",
   "command",
   "menus",
+  "mcp",
 ];
 
 // ---------------------------------------------------------------- 输出
@@ -423,6 +424,8 @@ function checkContributions(manifest, dir) {
   const workbenches = new Set();
   const commands = new Set();
   const usage = new Set();
+  let mcpCount = 0;
+  const hasManifestBackend = isPlainObject(manifest.entrypoints) && isPlainObject(manifest.entrypoints.backend);
   for (const contribution of manifest.contributions) {
     if (isPlainObject(contribution) && typeof contribution.id === "string") {
       if (declared.has(contribution.id)) error(`contributions 里 id 重复: ${contribution.id}`);
@@ -450,10 +453,10 @@ function checkContributions(manifest, dir) {
       if (reason) error(`${at}.icon 路径不安全: ${reason}`);
       else if (!state.files.has(contribution.icon)) error(`${at}.icon "${contribution.icon}" 不存在`);
     }
-    if (!['connection-provider', 'menus'].includes(contribution.type) && (typeof contribution.label !== "string" || contribution.label === "")) {
+    if (!['connection-provider', 'menus', 'mcp'].includes(contribution.type) && (typeof contribution.label !== "string" || contribution.label === "")) {
       error(`${at}.label 是必需的非空字符串`);
     }
-    if (["workbench", "filesystem-provider", "context-menu", "result-view", "command", "menus"].includes(type)) {
+    if (["workbench", "filesystem-provider", "context-menu", "result-view", "command", "menus", "mcp"].includes(type)) {
       const allowed = type === "context-menu"
         ? ["type", "id", "label", "description", "icon", "menu", "action"]
         : type === "workbench"
@@ -462,6 +465,8 @@ function checkContributions(manifest, dir) {
             ? ["type", "id", "label", "description", "icon", "action", "enablement"]
             : type === "menus"
               ? ["type", "id", "items"]
+              : type === "mcp"
+                ? ["type", "id", "description", "ai_tools", "external_tools"]
               : ["type", "id", "label", "description", "icon"];
       const extra = Object.keys(contribution).filter(
         (k) => !allowed.includes(k),
@@ -501,6 +506,13 @@ function checkContributions(manifest, dir) {
         break;
       case "menus":
         checkMenus(contribution, at, commands);
+        break;
+      case "mcp":
+        mcpCount += 1;
+        if (mcpCount > 1) error(`${at}: 每个 Manifest 最多声明一个 mcp contribution`);
+        if (!hasManifestBackend) error(`${at}: mcp contribution 要求 entrypoints.backend`);
+        if (contribution.ai_tools !== undefined && typeof contribution.ai_tools !== "boolean") error(`${at}.ai_tools 必须是布尔值`);
+        if (contribution.external_tools !== undefined && typeof contribution.external_tools !== "boolean") error(`${at}.external_tools 必须是布尔值`);
         break;
       default:
         break;
