@@ -296,7 +296,23 @@ mkdirSync(join(mcpDir, "bin", "darwin-arm64"), { recursive: true });
 mkdirSync(join(mcpDir, "backend"), { recursive: true });
 const mcpManifest = makeProject({ dir: mcpDir });
 mcpManifest.entrypoints.backend = { executable: "bin/darwin-arm64/backend" };
-mcpManifest.contributions.push({ type: "mcp", id: "com.example.demo.mcp", external_tools: true });
+mcpManifest.contributions.push(
+  {
+    type: "command",
+    id: "com.example.demo.logs",
+    label: "Logs",
+    action: {
+      type: "open-workbench",
+      workbench: "com.example.demo.main",
+      presentation: "panel",
+      reuse: "singleton",
+      instance_key: "logs:{{connectionId}}",
+      options_action: "list-shells",
+    },
+  },
+  { type: "context-menu", id: "com.example.demo.dynamic", label: "Dynamic", menu: "connection", dynamic: true },
+  { type: "mcp", id: "com.example.demo.mcp", external_tools: true },
+);
 writeFileSync(join(mcpDir, "manifest.json"), `${JSON.stringify(mcpManifest, null, 2)}\n`);
 writeFileSync(join(mcpDir, "bin", "darwin-arm64", "backend"), "#!/bin/sh\n");
 writeFileSync(join(mcpDir, "backend", "go.mod"), "module example.com/backend\n\ngo 1.22\n");
@@ -306,6 +322,8 @@ writeFileSync(join(mcpDir, "dbx-plugin.toml"), `schema_version = 1\n\n[package]\
   const parsed = JSON.parse(result.stdout);
   check("合法 mcp contribution 通过预检", result.status === 0, result.stdout.slice(0, 500));
   check("mcp contribution 不要求 label", parsed.ok === true);
+  check("命令支持按上下文复用和 options_action", parsed.ok === true);
+  check("动态 context-menu 通过预检", parsed.ok === true);
 }
 {
   const invalidMcp = { ...mcpManifest, contributions: [...mcpManifest.contributions, { type: "mcp", id: "com.example.demo.mcp2", ai_tools: "yes" }] };
@@ -314,6 +332,33 @@ writeFileSync(join(mcpDir, "dbx-plugin.toml"), `schema_version = 1\n\n[package]\
   const parsed = JSON.parse(result.stdout);
   const messages = parsed.findings.map((f) => f.message).join("\n");
   check("mcp contribution 重复或类型错误被拒绝", result.status === 1 && messages.includes("最多声明一个 mcp") && messages.includes("ai_tools 必须是布尔值"), messages);
+}
+
+{
+  const invalidCommand = {
+    ...mcpManifest,
+    contributions: mcpManifest.contributions.map((item) =>
+      item.type === "command" ? { ...item, action: { ...item.action, reuse: "sometimes" } } : item,
+    ),
+  };
+  writeFileSync(join(mcpDir, "manifest.json"), `${JSON.stringify(invalidCommand, null, 2)}\n`);
+  const result = run([join(scripts, "check-project.mjs"), mcpDir, "--json"]);
+  const parsed = JSON.parse(result.stdout);
+  const messages = parsed.findings.map((f) => f.message).join("\n");
+  check("非法 command.reuse 被拒绝", result.status === 1 && messages.includes("reuse 必须是 singleton 或 new"), messages);
+}
+
+{
+  const withoutBackend = {
+    ...mcpManifest,
+    entrypoints: { ui: mcpManifest.entrypoints.ui },
+    contributions: mcpManifest.contributions.filter((item) => item.type !== "mcp"),
+  };
+  writeFileSync(join(mcpDir, "manifest.json"), `${JSON.stringify(withoutBackend, null, 2)}\n`);
+  const result = run([join(scripts, "check-project.mjs"), mcpDir, "--json"]);
+  const parsed = JSON.parse(result.stdout);
+  const messages = parsed.findings.map((f) => f.message).join("\n");
+  check("动态菜单和 options_action 缺少后端时被拒绝", result.status === 1 && messages.includes("dynamic 为 true 时要求 entrypoints.backend") && messages.includes("options_action 要求 entrypoints.backend"), messages);
 }
 
 const badDir = join(work, "bad");

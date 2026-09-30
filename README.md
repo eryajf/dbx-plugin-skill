@@ -71,7 +71,7 @@ skill/
 ├── SKILL.md                          # 入口：心智模型、路由表、标准工作流、硬性约束
 ├── references/
 │   ├── manifest.md                   # Manifest v1 字段、权限、入口、国际化、打包期重写
-│   ├── contributions.md              # 7 类贡献点、连接表单/binding、命令菜单、文件系统 RPC
+│   ├── contributions.md              # 8 类贡献点、连接表单/binding、命令菜单、文件系统 RPC
 │   ├── host-api.md                   # window.dbxPlugin、context 规则、主题、CSP、资源
 │   ├── sidecar-protocol.md           # 协议 v1、JSONL/framed、Rust/Go SDK、错误码
 │   ├── cli.md                        # create / dev / package / keygen 全参数与环境变量

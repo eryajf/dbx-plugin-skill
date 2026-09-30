@@ -25,7 +25,7 @@ const locale = window.dbxPlugin.locale;
 | `onContext(fn)` | 监听 context 变化，返回取消订阅函数 | — |
 | `locale` | 当前语言（`en`、`zh-CN` 等） | — |
 | `theme` | `{ appearance: "light" \| "dark", tokens }` | — |
-| `capabilities` | 初始化消息公布的 `planApi`、`schemaMetadataApi`、`dataApi`、`storage`、`ai`、`aiRecommendations`、剪贴板等能力位 | — |
+| `capabilities` | 初始化消息公布的 `downloadFile`、`planApi`、`schemaMetadataApi`、`dataApi`、`storage`、`ai`、`aiModelDiscovery`、`aiCompletion`、`aiRecommendations`、`clipboardWrite`、`clipboardRead` 等能力位 | — |
 | `request(method, params)` | 调用 **Host API** | — |
 | `invoke(method, params, { timeoutMs })` | 调用**自己 Sidecar** 的 RPC（有响应） | — |
 | `notify(method, params)` | 向自己 Sidecar 发通知（无业务返回值） | — |
@@ -33,7 +33,8 @@ const locale = window.dbxPlugin.locale;
 | `onBinary(fn)` | 接收二进制，回调参数 `{ channel, data: Uint8Array }` | `host.binary` |
 | `readAsset(path)` | 读取包内资源 | — |
 | `readAssetUrl(path)` | 读取包内资源并返回对象 URL | — |
-| `openWorkbench(id, context)` | 打开本插件另一个工作台 | `host.workbench` |
+| `openWorkbench(id, context, options?)` | 打开本插件另一个工作台；dock 面板可用 `target: "tab"` 请求主工作台标签页 | `host.workbench` |
+| `executeCommand(commandId, context?)` | 执行本插件自己声明的命令，重新检查 enablement 并按命令的 tab/panel 语义复用或打开实例 | `host.workbench` |
 | `openFilesystem(id, context)` | 打开本插件的文件系统入口 | `host.filesystem` |
 | `getPlanCapabilities(connectionId)` / `explainPlan(request)` | 读取指定连接的估算执行计划 | `host.plans:read` |
 | `getTableMetadata({ connectionId, database?, schema?, table })` | 读取已打开连接中单个 table 的窄化结构元数据 | `host.schema:read` |
@@ -42,6 +43,9 @@ const locale = window.dbxPlugin.locale;
 | `clipboard.readText()` | 读取系统剪贴板 | `host.clipboard:read` |
 | `storage.get(key)` / `storage.set(key, value)` / `storage.delete(key)` | 持久化本插件工作台的小型 JSON 状态 | `host.storage` |
 | `ai.openConversation({ title, prompt, context, send?, mode? })` | 在 DBX 内置 AI 面板创建插件对话；`mode` 默认 `ask`，可选 `agent` 使用当前连接的插件工具 | `host.ai` |
+| `ai.listProviders()` / `ai.discoverModels(configId)` | 列出可用的 API 提供商，或由宿主使用已保存凭据发现模型 | `host.ai` + `capabilities.aiModelDiscovery` |
+| `ai.listModels()` | 返回已配置 API 模型的脱敏选择项；不返回 endpoint、Key、header 或 CLI agent | `host.ai` + `capabilities.aiCompletion` |
+| `ai.generateText({ configId, model, prompt })` | 经宿主确认后生成纯文本；不启用工具或文件写入 | `host.ai` + `capabilities.aiCompletion` |
 | `ai.setRecommendations({ context, items })` / `ai.clearRecommendations()` | 更新或清空当前 Workbench 的全局 AI 推荐问题（最多 5 条） | `host.ai` + `capabilities.aiRecommendations` |
 | `fileTransfer` | 桌面端经用户明确同意后的本地文件选择、保存和系统拖放流；Web 宿主通常不提供 | — |
 | `onInit(fn)` | 监听初始化/环境变化 | — |
@@ -151,9 +155,50 @@ await dbxPlugin.ai.clearRecommendations();
 
 `items` 最多 5 条；`label` 最多 200 字符，`prompt` 最多 32000 字符。`{{path.to.value}}` 支持对象属性和数组下标，无法解析的路径会隐藏推荐，`__proto__`、`prototype`、`constructor` 等路径会被拒绝。运行时 context 会与当前 Workbench 的 `connectionId` 等绑定信息合并，点击推荐后由 DBX 创建新的 Agent 对话并立即发送。插件不会收到模型输出。
 
+### AI 模型发现与文本生成
+
+Host API 还可以让插件使用 DBX 已配置的 API 模型完成一次受控的纯文本生成。它与 `ai.openConversation` 分开：对话 API 不把模型结果返回给插件，文本生成 API 会返回生成文本，但不会开放工具、文件写入或凭据。
+
+```js
+if (window.dbxPlugin.capabilities.aiModelDiscovery) {
+  const providers = await window.dbxPlugin.ai.listProviders();
+  const models = await window.dbxPlugin.ai.discoverModels(providers[0].configId);
+}
+
+if (window.dbxPlugin.capabilities.aiCompletion) {
+  const models = await window.dbxPlugin.ai.listModels();
+  const text = await window.dbxPlugin.ai.generateText({
+    configId: models[0].configId,
+    model: models[0].model,
+    prompt: "Summarize the selected rows.",
+  });
+}
+```
+
+- `listProviders` 只返回 `configId` 与显示名称；`discoverModels` 由宿主在内部使用保存的凭据，可返回不含密钥的模型选择项。CLI agent 不会出现在文本生成列表中，手工填写模型 ID 也不会修改全局默认值。
+- 发送前桌面宿主会显示包含插件名和模型名的确认；每个 Workbench 同时只允许一次生成。`prompt` 必须非空且不超过 100000 字符，返回文本不超过 16000 字符。
+- 提供商错误会被归一化，插件不会看到 endpoint、header、Token 或其它凭据。旧宿主可能不提供这两个能力位，应隐藏对应入口并保留其它功能。
+
+`openWorkbench` 还接受可选的 `{ forceNew?: boolean, target?: "tab" }`。`target: "tab"` 只对 dock 等面板宿主有意义，用于把当前插件工作台打开到主工作区标签页；省略时保持原有面板行为。`executeCommand(commandId, context?)` 走与菜单相同的命令注册表路径，会重新检查 `enablement`，合并调用方 context 并由宿主重写保留的身份字段；命令的 `instance_key` 占位符可按 `{{connectionId}}` 等路径隔离面板实例。预期的未知命令或 enablement 拒绝通过 `{ error }` 返回，只有权限或桥接故障才 reject。
+
 ### 桌面文件传输与系统拖放
 
-桌面宿主可通过 `window.dbxPlugin.fileTransfer` 将用户明确选择或拖入工作台的本地文件按分块提供给插件。使用 `pick`/`beginSave` 打开原生对话框，使用 `read` 逐块读取；拖放通过 `onDrop` 接收。Web 宿主没有 `fileTransfer` 时应回退到 `<input type="file">` 或 Sidecar 自己的上传协议，不要假设浏览器可读取客户端绝对路径。
+桌面宿主可通过 `window.dbxPlugin.fileTransfer` 将用户明确选择或拖入工作台的本地文件按分块提供给插件。使用 `pick`/`beginSave` 打开原生对话框，使用 `read` 逐块读取；拖放通过 `onDrop` 接收。拖入文件夹会展开为普通文件，并保留 `relativePath`，方便插件重建目录结构。句柄按需打开，选择数量超过共享句柄池时会降级为惰性条目，不会静默丢文件。
+
+`onDrop` 的监听器签名为 `(files, { dropId, truncated })`：`dropId` 用于整组文件的取消和进度记账，`truncated` 表示展开因 2000 个文件或 8 层深度上限被截断。点文件和点目录会跳过。能力探测使用 init 消息中的 additive `capabilities.fileTransfer` 标志（`pick`、`beginSave`、`read`、`drop`、`folderExpansion`），不要靠试调用。Web 宿主可把 `pick`/`beginSave` 降级到浏览器选择和下载，但 `drop` / `folderExpansion` 为 false，且句柄不含 `relativePath`；只在拖放落点位于本插件工作台区域内时触发 `onDrop`。
+
+```js
+const transfer = window.dbxPlugin.fileTransfer;
+if (transfer && window.dbxPlugin.capabilities.fileTransfer?.drop) {
+  const off = transfer.onDrop((files, meta) => {
+    for (const file of files) {
+      // file.relativePath 可为 folder/nested/file.csv
+      uploadFile(file.handleId, file.relativePath ?? file.name, meta.dropId);
+    }
+    if (meta.truncated) showWarning("文件夹内容已截断，请分批拖放");
+  });
+}
+```
 
 ## 3. context 与快照规则
 

@@ -196,7 +196,7 @@ SSH 作为最后一层时，路由是该跳板的动态 SOCKS5 端点；配置 S
 
 ## 4. `command` 与 `menus`
 
-`command` 声明可执行动作；当前动作类型是由 Host 直接打开同插件 Workbench 的 `open-workbench`。`action.workbench` 必须引用同一 Manifest 中的 `workbench`，可选 `presentation` 为 `tab` 或 `panel`，可传 JSON `context`。
+`command` 声明可执行动作；当前动作类型是由 Host 直接打开同插件 Workbench 的 `open-workbench`。`action.workbench` 必须引用同一 Manifest 中的 `workbench`，可选 `presentation` 为 `tab` 或 `panel`，可传 JSON `context`。`reuse` 可设为 `singleton`（默认）或 `new`；`instance_key` 支持 `{{path.to.value}}` 占位符，让 panel 按连接或资源分出独立实例。
 
 ```json
 {
@@ -207,12 +207,24 @@ SSH 作为最后一层时，路由是该跳板的动态 SOCKS5 端点；配置 S
     "type": "open-workbench",
     "workbench": "com.example.files.main",
     "presentation": "tab",
-    "context": { "path": "/" }
+    "context": { "path": "/" },
+    "reuse": "singleton",
+    "instance_key": "files:{{connectionId}}"
   }
 }
 ```
 
-`enablement` 可声明命令可用条件，由宿主决定当前上下文是否可执行。插件不应假设不兼容的 DBX 版本会显示该命令。
+`enablement` 可声明命令可用条件，由宿主决定当前上下文是否可执行。插件不应假设不兼容的 DBX 版本会显示该命令。工作台 UI 也可以调用 `dbxPlugin.executeCommand(commandId, context?)`；宿主会再次检查 `enablement`、合并调用方 context 并剥离 `workbenchId`、`restored`、`surface` 等保留字段。未知命令或被禁用命令通过 `{ error }` 返回。宿主上下文中的 `surface: "dock"` 表示底部停靠面板，`surface: "tab"` 表示主工作区标签页；插件不要再把旧的 `panel` surface 值当作稳定契约。
+
+dock command 的 `open-workbench` action 还可以声明 `options_action: "<sidecar method>"`，由 Sidecar 根据当前 locale 返回启动选项：
+
+```json
+{
+  "options_action": "list-shells"
+}
+```
+
+Sidecar 收到 `{ "locale": "zh-CN" }`，返回 `{ "entries": [{ "label": "zsh", "description": "/bin/zsh", "context": { "shell": "zsh" } }] }`。`context` 是插件自有不透明数据，会并入宿主生成的 Workbench context；Host 不解释它。声明后该命令拥有自己的选项选择器，通用重放入口不会在加载失败时自动恢复。`options_action` 只适用于 dock command，不能写到 context-menu action。
 
 `menus` 把命令放入宿主 UI；`items` 每项必须有 `location`、`command`、`group` 和整数 `order`，位置只能是 `commandPalette`、`appToolbar`、`appSidebar`，可选 `default_visible` 和 `when`：
 
@@ -227,7 +239,7 @@ SSH 作为最后一层时，路由是该跳板的动态 SOCKS5 端点；配置 S
 }
 ```
 
-快捷入口的显示位置、排序和插件级隐藏开关由 **插件中心 → 设置 → 全局配置** 管理；`appToolbar` 的可见条件和命令 enablement 会被保留。位置只影响图标位置，不会关闭已经打开的 Workbench 会话。
+快捷入口的显示位置、排序和插件级隐藏开关由 **插件中心 → 设置 → 全局配置** 管理；`appToolbar` 的可见条件和命令 enablement 会被保留。位置只影响图标位置，不会关闭已经打开的 Workbench 会话。dock 中的工作台可以通过 `openWorkbench(id, context, { target: "tab" })` 切换到主工作区标签页。
 
 ## 5. `filesystem-provider`
 
@@ -307,6 +319,22 @@ SSH 作为最后一层时，路由是该跳板的动态 SOCKS5 端点；配置 S
 ```
 
 `action.workbench` 必须引用同一 Manifest 中的 `workbench` contribution。`connection` 菜单会把 `{ id, dbType, name, database }` 作为 Workbench context，`table` 菜单会把稳定的 TableContext 直接作为 context；两者均不含凭据。未声明 `action` 的旧式条目才要求后端，返回 `{ "message": "..." }` 会在界面上弹 toast。
+
+### 动态 context-menu
+
+需要按连接状态生成原生子菜单时，把 `dynamic` 设为 `true`，并声明 backend entrypoint。每次用户打开右键菜单，Host 调用 `contextMenu/resolve/<id>`，参数沿用非敏感的 `connection` 或 `table` envelope，并附带当前 `locale`；连接菜单还会带 `ownerPluginId`。插件返回 `{ "items": [...] }`，返回空数组会隐藏该贡献点。
+
+```json
+{
+  "type": "context-menu",
+  "id": "com.example.tunnels",
+  "label": "Tunnels",
+  "menu": "connection",
+  "dynamic": true
+}
+```
+
+每项可有 `label`、`visible`、`enabled`、`checked`，并二选一使用 `action` 或 `children`；只允许一层子菜单。`invoke` action 只能调用当前 contribution 已有的 `contextMenu/<id>` 方法，Host 会附加 `itemId`，不会执行 Sidecar 返回的任意方法名。连接项可用 `reopenConnectionOnMissing: true` 在返回 `Connection is not active` 时让 DBX 恢复一次连接；`open-workbench` action 必须引用同插件的 Workbench，并可用 `presentation: "dialog"` 打开模态工作台。响应超时、超限或格式错误时整组菜单不展示；静态 context-menu 行为不变。
 
 ---
 

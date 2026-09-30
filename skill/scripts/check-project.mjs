@@ -458,7 +458,7 @@ function checkContributions(manifest, dir) {
     }
     if (["workbench", "filesystem-provider", "context-menu", "result-view", "command", "menus", "mcp"].includes(type)) {
       const allowed = type === "context-menu"
-        ? ["type", "id", "label", "description", "icon", "menu", "action"]
+        ? ["type", "id", "label", "description", "icon", "menu", "dynamic", "action"]
         : type === "workbench"
           ? ["type", "id", "label", "description", "icon", "ai"]
           : type === "command"
@@ -487,6 +487,12 @@ function checkContributions(manifest, dir) {
         if (!["connection", "table"].includes(contribution.menu)) {
           error(`${at}.menu 必须是 "connection" 或 "table"`);
         }
+        if (contribution.dynamic !== undefined && typeof contribution.dynamic !== "boolean") {
+          error(`${at}.dynamic 必须是布尔值`);
+        }
+        if (contribution.dynamic === true && !hasManifestBackend) {
+          error(`${at}.dynamic 为 true 时要求 entrypoints.backend`);
+        }
         if (contribution.action !== undefined) {
           const actionKeys = isPlainObject(contribution.action) ? Object.keys(contribution.action) : [];
           if (!isPlainObject(contribution.action) || actionKeys.some((key) => !["type", "workbench"].includes(key)) || contribution.action.type !== "open-workbench" || typeof contribution.action.workbench !== "string") {
@@ -502,7 +508,7 @@ function checkContributions(manifest, dir) {
         checkWorkbenchAi(contribution, at);
         break;
       case "command":
-        checkCommand(contribution, at, workbenches, usage);
+        checkCommand(contribution, at, workbenches, usage, hasManifestBackend);
         break;
       case "menus":
         checkMenus(contribution, at, commands);
@@ -563,7 +569,7 @@ function checkWorkbenchAi(contribution, at) {
   });
 }
 
-function checkCommand(contribution, at, workbenches, usage) {
+function checkCommand(contribution, at, workbenches, usage, hasManifestBackend) {
   if (!isPlainObject(contribution.action)) {
     error(`${at}.action 必须是对象`);
   } else {
@@ -574,10 +580,20 @@ function checkCommand(contribution, at, workbenches, usage) {
       if (!workbenches.has(action.workbench)) error(`${at}.action.workbench 引用未声明的 workbench: ${action.workbench}`);
       else usage.add(action.workbench);
     }
-    const extra = Object.keys(action).filter((key) => !["type", "workbench", "presentation", "context"].includes(key));
+    const extra = Object.keys(action).filter((key) => !["type", "workbench", "presentation", "context", "reuse", "instance_key", "options_action"].includes(key));
     if (extra.length) error(`${at}.action 含未知字段: ${extra.join(", ")}`);
     if (action.presentation !== undefined && !["tab", "panel"].includes(action.presentation)) error(`${at}.action.presentation 必须是 tab 或 panel`);
     if (action.context !== undefined && !isPlainObject(action.context)) error(`${at}.action.context 必须是对象`);
+    if (action.reuse !== undefined && !["singleton", "new"].includes(action.reuse)) error(`${at}.action.reuse 必须是 singleton 或 new`);
+    if (action.instance_key !== undefined && (typeof action.instance_key !== "string" || action.instance_key.length === 0 || action.instance_key.length > 256)) {
+      error(`${at}.action.instance_key 必须是 1–256 字符的非空字符串`);
+    }
+    if (action.options_action !== undefined && (typeof action.options_action !== "string" || action.options_action.length === 0 || action.options_action.length > 256)) {
+      error(`${at}.action.options_action 必须是 1–256 字符的非空字符串`);
+    }
+    if (action.options_action !== undefined && !hasManifestBackend) {
+      error(`${at}.action.options_action 要求 entrypoints.backend`);
+    }
   }
   if (contribution.enablement !== undefined && !isPlainObject(contribution.enablement)) error(`${at}.enablement 必须是对象`);
 }
