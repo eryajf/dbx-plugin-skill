@@ -34,6 +34,13 @@ SDK **不需要启动**：没有常驻 SDK Server。开发时只用三类工具�
 
 > 上架 PR 提到 `t8y2/dbx-store`，**不是** `t8y2/dbx`。普通插件源码也不要复制进 `t8y2/dbx`。
 
+### 0.2.1 插件中心、仓库和目录的边界
+
+- 插件中心分为 Marketplace、Installed 和 Settings：前者读取目录并按当前平台选择 artifact，Installed 管理已安装实例，Settings 管理本地 `.dbxp`、自定义仓库和开发包开关。
+- 官方目录固定为 `https://raw.githubusercontent.com/t8y2/dbx-store/main/catalog/index.json`，不能在插件中心设置里替换。官方仓库公钥由 DBX 内置；自定义仓库使用用户管理的公钥，不能借此伪装成官方仓库。
+- Marketplace 先选择精确的当前 target，再回退到 `universal`；客户端会校验目录声明的 URL、大小、SHA-256、Manifest 身份、权限和 `signingKeyId`，只有受信任的 Ed25519 仓库签名包才会激活。
+- 连接型插件的快捷入口由插件中心全局配置管理。入口可排序、按插件隐藏，`appToolbar` 的可见条件和命令 enablement 仍然生效；隐藏入口不会关闭已经打开的工作台。插件设置入口位于入口列表末尾，没有可显示入口时整个快捷区域隐藏。
+
 ### 0.3 包与签名模型
 
 ```
@@ -123,6 +130,8 @@ dbx-plugin package .
 # 前端：dist/<id>-<ver>-universal.dbxp + .artifact.json
 # 原生：dist/<id>-<ver>-<os>-<arch>.dbxp + .artifact.json（必须在对应平台构建）
 ```
+
+`.dbxp` 内含 `checksums.json`，除该文件和签名文件外的每个条目都必须恰好有 SHA-256；正式安装要求受信任仓库签名，未签名包只在显式开发安装开关下接受。已安装版本不可原地覆盖，DBX 通过激活记录支持回滚。
 
 打包前先跑随附预检脚本（见 §5），它能提前发现 manifest/toml/include/资源不一致。
 

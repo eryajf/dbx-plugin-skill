@@ -95,6 +95,8 @@
 
 插件连接的 `external_config` 会在新建、编辑、保存和重新连接流程中保留；升级插件时要显式迁移自己拥有的 `external_config`。
 
+连接显示信息按 `connection-provider.label` / `icon`、插件级 `name` / `icon`、provider ID 和内置通用插件图标的顺序回退。Contribution 图标必须留在包内，可用 SVG、PNG、JPEG、GIF、WebP 或 ICO；商店目录的图标仍只接受 SVG/PNG。可选字段未声明时保持缺省，不会被宿主伪造成空字符串；`default: null` 与省略字段语义相同，插件应把它当作未设置值处理。
+
 ### `capabilities`
 枚举 `test`、`connect`、`disconnect`，unique。声明什么就要实现什么（见 §2）。
 
@@ -239,7 +241,7 @@ Sidecar 收到 `{ "locale": "zh-CN" }`，返回 `{ "entries": [{ "label": "zsh",
 }
 ```
 
-快捷入口的显示位置、排序和插件级隐藏开关由 **插件中心 → 设置 → 全局配置** 管理；`appToolbar` 的可见条件和命令 enablement 会被保留。位置只影响图标位置，不会关闭已经打开的 Workbench 会话。dock 中的工作台可以通过 `openWorkbench(id, context, { target: "tab" })` 切换到主工作区标签页。
+快捷入口的显示位置、排序和插件级隐藏开关由 **插件中心 → 设置 → 全局配置** 管理；`appToolbar` 的可见条件和命令 enablement 会被保留。所有位置共用排序记录，隐藏或卸载不会删除记录；插件设置入口固定在列表末尾，关闭它不会影响其它入口。位置只影响图标位置，不会关闭已经打开的 Workbench 会话。dock 中的工作台可以通过 `openWorkbench(id, context, { target: "tab" })` 切换到主工作区标签页。
 
 ## 5. `filesystem-provider`
 
