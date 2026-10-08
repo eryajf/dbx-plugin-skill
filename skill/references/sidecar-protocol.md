@@ -121,6 +121,10 @@ kind: u8 | payload_length: u32 big-endian | payload
 
 `connection` 只在**后端生命周期请求**中携带补齐的 Secret；`runtime.host` / `runtime.port` 是经过 DBX 隧道/代理后的**最终逻辑端点**，直接连它。多端点协议若在 connection-provider 上声明 `proxy_route: true`，还会收到 `runtime.proxy` SOCKS5 路由，插件应通过它连接广播端点。
 
+### 媒体范围读取
+
+桌面 `dbxPlugin.media.open("filesystem/media/read", params)` 为 audio/video 创建本插件媒体 URL。Host 调用同名 Sidecar 方法时会加入 `head: boolean`，并在浏览器发起 Range 请求时加入 `range: string`；超时为 30 秒。返回 `{ size, offset?, length?, dataBase64?, partial?, rangeNotSatisfiable?, contentType?, etag? }`：`size` 是总字节数，GET 的 base64 解码长度必须等于 `length`，HEAD 可不返回字节。不满足范围时返回 `rangeNotSatisfiable: true` 与总大小，Host 转为 HTTP 416；部分读取转为 206/Content-Range。后端自行实现范围读取，不能把整个大文件一次塞进 JSON。
+
 ## 7. 事件
 
 插件通过 emitter 主动推送事件（JSON-RPC 通知）：
@@ -132,6 +136,8 @@ kind: u8 | payload_length: u32 big-endian | payload
 前端用 `window.dbxPlugin.onEvent(fn)` 接收，**需要 `host.events` 权限**。转发后端事件必须有该权限。
 
 **绝对不要在事件、context 或错误消息中泄露 Secret。**
+
+浏览器桥还提供 `dbxPlugin.stream(method, params, options)`：后端收到 `streamId` 后，用 `host.stream.chunk` 推送 `{ streamId, dataBase64 }`，以 `host.stream.end` 或 `host.stream.error`（`message`）结束。取消默认调用 `filesystem/stream/close` 并传 `{ streamId }`。这是事件层封装，不改变 Protocol v1 的帧大小或自动提供背压。
 
 ## 8. Host API 1.1：请求用户输入
 

@@ -76,7 +76,7 @@
 }
 ```
 
-**最关键的一条：`artifacts[].url` 必须是纯文件名，不是 URL。**
+`artifacts[].url` 推荐使用纯 `.dbxp` 文件名；当前同步器也接受指向**同仓库、同 Release tag** 的完整 HTTPS GitHub 下载 URL。随附生成器统一规范化成文件名。
 
 同步脚本用 `path.posix.basename` + 正则 `^[A-Za-z0-9._-]+\.dbxp$` 校验，然后**自己拼出**
 `https://github.com/<你的仓库>/releases/download/<tag>/<文件名>`。
@@ -85,14 +85,16 @@
 | --- | --- |
 | `a.dbxp` | ✅ |
 | `a.dbxp?x=1` | ✅（query 被忽略） |
-| `sub/a.dbxp` | ❌ `Invalid candidate artifact` |
-| `https://github.com/.../a.dbxp` | ❌ 完整 URL 被拒 |
+| `sub/a.dbxp` | ❌ `must be a file name or a same-release GitHub URL` |
+| `https://github.com/<当前仓库>/releases/download/<当前tag>/a.dbxp` | ✅ 同仓库同 Release |
+| 其他仓库/tag 的 GitHub 下载 URL 或外部 CDN 路径 | ❌ 自动同步不接受；手工候选的 HTTPS URL 是另一契约 |
 | `a.zip` | ❌ 必须以 `.dbxp` 结尾 |
 | `a-1.2.3+build.dbxp` | ❌ `+` 不在允许字符集内 |
 
 其他硬约束：
 
 - `plugin.id` / `plugin.publisher` / `plugin.version` 必需；`artifacts` 非空。
+- `plugin.permissions` 应从打包 Manifest 生成。同步器优先使用其**非空数组**并去重排序，覆盖 `.dbx-store.json.permissions`；缺失或空数组会回退到商店元数据。因此清空权限时，必须同时更新 `.dbx-store.json.permissions: []`，不能仅依赖空 identity 权限列表。随附生成器输出该字段，并继续拒绝过时的商店权限副本。
 - `target` 必须匹配 `^[a-z0-9-]{1,64}$` 且唯一。
 - `sha256` 64 位十六进制；`size` 1 … 512 MiB。
 - **`+build` 版本号会破坏自动化链路**（拼出的文件名含 `+`）—— 上架版本不要用 build metadata。
@@ -340,7 +342,7 @@ https://raw.githubusercontent.com/t8y2/dbx-store/main/catalog/index.json
 | --- | --- |
 | `contains unknown field(s): X` | 多写了字段（候选/目标/插件/版本/artifact/本地化/publisher/密钥/撤销记录全部是严格键集） |
 | `filename must match plugin id '<id>.json'` | 文件名与 `id` 不一致 |
-| `publisher '<p>' is not registered` | publisher 记录不在 base 分支 |
+| `publisher '<p>' is not registered` | publisher 记录缺失或 ID 不一致；首次可在同一个候选 PR 中新增，签名 overlay 会保留新增记录 |
 | `publisher '<p>' does not own plugin '<id>'` | 该 publisher 不是现有插件的所有者 |
 | `version '<v>' is already listed for plugin '<id>'` | 复用了已上架版本 |
 | `plugin version '<id>@<v>' is revoked` | 该版本已被撤销 |
@@ -360,7 +362,7 @@ https://raw.githubusercontent.com/t8y2/dbx-store/main/catalog/index.json
 | `preview signing key '<k>' cannot publish catalog artifacts` | 目录引用了 preview key |
 | `Binary plugin package must not be committed: <path>` | 仓库里有 `.dbxp` |
 | `Repository file exceeds 1 MiB: <path>` | 工作树里有大文件（含未跟踪文件） |
-| `Invalid candidate artifact '<v>'` | `release-candidates.json` 里的 `url` 不是纯 `.dbxp` 文件名 |
+| `Invalid candidate artifact '<v>'` | URL 文件名不是允许的 `.dbxp` 名称；完整 URL 还必须属于当前仓库、当前 Release |
 | `No published candidate release found for <repo>` | 最新 Release 里没有名为 `release-candidates.json` 的资产，或 Release 是 draft/prerelease |
 | `Unsupported store metadata field '<k>'` | `.dbx-store.json` 写了不在白名单的键 |
 

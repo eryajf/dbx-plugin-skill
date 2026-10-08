@@ -142,7 +142,7 @@ node <skill-root>/scripts/dev-logs.mjs --port 5190 --level error --follow
 - 连接生命周期 `connection/test` / `connect` / `disconnect`，`success: false` 按真实宿主规则视为失败。
 - 工作台 Tab：按贡献点 + 可选连接 ID 建键，切换时保留 iframe，重复打开复用已有 Tab；关闭某个连接的最后一个 Tab 会在确认后断开连接。
 - 自定义 RPC 方法与结果原样转发（不解释业务含义）。
-- Host API 子集：`ready`、`context`、`locale`、`theme`、`request`、`invoke`、`notify`、`onInit`、`onContext`、`onEvent`、`onBinary`、`sendBinary`、资源读取、`openWorkbench`。
+- Host API 子集：`ready`、`contributionId`（ready 后可读）、`context`、`locale`、`theme`、`request`、`invoke`、`notify`、`onInit`、`onContext`、`onEvent`、`onBinary`、`sendBinary`、资源读取、`openWorkbench`。
 - 后端传输：默认 `stdio-jsonl` 与显式 `stdio-framed`，协议 v1；初始化会校验插件身份与版本。二进制通道需要 framed。
 - 权限强制执行：event、binary、workbench 导航权限会被检查。
 - 图标：workbench 条目/Tab/连接行使用贡献点 `icon`，回退到插件级 `icon`；图标路径相对**插件项目根**（不是 UI root），拒绝远程 URL 与越界路径；缺失时用宿主通用图标。
@@ -150,6 +150,7 @@ node <skill-root>/scripts/dev-logs.mjs --port 5190 --level error --follow
 **不支持 / 必须在真实 DBX 复验**
 
 - `host.openFilesystem` 等未实现方法**直接返回错误**。
+- `floating`、`closeWorkbench`、全屏委派、图形引擎授权、剪贴板图片、Sidecar/媒体流、AI 流式生成与取消均不模拟。开发宿主支持 contribution identity 不代表支持桌面 surface。
 - `executeCommand`、AI 模型发现/文本生成、原生动态 context-menu/options_action、桌面端 `fileTransfer` 与 `openWorkbench({ target: "tab" })` **不模拟**；需要在真实 DBX 中复验。
 - 原生连接动作（connection actions）、query-result 贡献点、完整 DBX 组件 kit **不模拟**。
 - `host.ai` 的对话和推荐请求只做权限与参数校验，不会在开发壳中运行真实模型或 Agent 工具；推荐与 AI 面板行为要在真实 DBX 中复验。

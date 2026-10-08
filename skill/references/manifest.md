@@ -56,7 +56,7 @@
 - `host.storage` 只允许使用工作台专属的小型 JSON 状态存储；单个值上限 256 KiB、每个插件总量上限 1 MiB，不能借此访问任意文件。调用前检查初始化能力中的 `storage`。
 - `host.ai` 允许工作台把插件提供的数据快照交给 DBX 内置 AI 面板创建对话，也可在宿主确认后请求受控的纯文本生成；对话 API 不返回模型输出，文本生成 API 只返回纯文本，不开放工具、文件写入或凭据。调用前分别检查 `ai`、`aiModelDiscovery` 和 `aiCompletion`；旧版宿主可能拒绝未知权限，因此需要兼容旧宿主时应将其作为可选能力。
 - `host.schema:read` 只允许通过 `getTableMetadata` 读取已打开连接中单个 table 的窄化 schema metadata；不允许任意 SQL、写入、凭据读取或隐式重连。调用前检查初始化能力中的 `schemaMetadataApi`；依赖该能力的插件应声明 `engines.host_api: "^1.3"`。
-- `host.clipboard:read` 允许读取系统剪贴板；写入剪贴板无需权限。读取前检查 `capabilities.clipboardRead`，依赖该能力时声明 `engines.host_api: "^1.3"`。
+- `host.clipboard:read` 允许读取系统剪贴板；写入剪贴板无需权限。读取文本前检查 `capabilities.clipboardRead`，图片读取检查 `clipboardImageRead`；当前实现还增加会话首次确认和限频，详见 `host-api.md`。依赖该能力时声明 `engines.host_api: "^1.3"`。
 - `host.data:read` 允许在用户逐个授权的已打开连接上执行单条只读 SQL；不允许写入、DDL、锁定读、切换数据库或隐式重连。调用前检查 `capabilities.dataApi`，依赖该能力时声明 `engines.host_api: "^1.4"`。
 - 网络权限 `host.network:https://<host>[:port]`：
   - **必须 HTTPS**；主机名只允许 `[A-Za-z0-9._-]`，端口可选数字；
@@ -150,6 +150,8 @@ CLI 打包还会校验：`icon` / `ui.entry` 指向的文件必须存在，且**
 `workbench` contribution 可增加 `ai.recommendations`（最多 5 项），每项必需 `id`、`label`、`prompt`，可选整数 `order`。推荐文本支持从当前 Workbench context 读取的 `{{resource.name}}` 等路径；无法解析的路径以及 `__proto__`、`prototype`、`constructor` 会被拒绝或隐藏。运行时可用 `ai.setRecommendations({ context, items })` 替换默认项，用 `ai.clearRecommendations()` 清空；需声明 `host.ai` 并检查 `capabilities.aiRecommendations`。
 
 Manifest v1 还支持 `command`、`menus` 与 `mcp` contribution：命令当前通过 `action: { type: "open-workbench", workbench, presentation?, context?, reuse?, instance_key?, options_action? }` 打开同插件工作台；`instance_key` 可用 `{{path}}` 按连接或资源分隔面板实例，`options_action` 让 dock command 从 Sidecar 获取带 locale 的启动选项；工作台 UI 还可用 `dbxPlugin.executeCommand` 执行本插件自己的命令。菜单项通过 `location`（`commandPalette`、`appToolbar`、`appSidebar`）、`command`、`group`、`order` 放置命令，可选 `default_visible` 和 `when`。`context-menu` 可设 `dynamic: true` 生成一层原生子菜单，但必须有 backend entrypoint。`mcp` 用 `ai_tools` / `external_tools` 控制 Sidecar MCP 工具是否进入内置 AI 与外部 `dbx` MCP 服务，要求 backend entrypoint 且每个 Manifest 最多一个。具体示例与引用规则见 `contributions.md`。
+
+浮动窗口仍属于 `workbench`，打开用现有 `host.workbench` 权限与 `capabilities.floating`，不要添加 `host.floating` 或 `presentation: "window"`。图形引擎的 `unsafe-eval` 授权由宿主按插件管理，同样不是 Manifest 字段。
 
 ## 7. 最小可用示例
 

@@ -16,7 +16,7 @@ description: DBX 插件开发全流程。Use when 创建、开发、调试、打
 | --- | --- | --- |
 | Manifest v1 | `manifest.json` | 插件身份、权限、入口、贡献点、国际化。运行时契约，**拒绝未声明字段** |
 | 构建配置 | `dbx-plugin.toml` | 打包包含哪些目录、是否有原生后端、dev 构建命令。**不进入插件包** |
-| Host API 1.x | `window.dbxPlugin` / Sidecar callback | 沙箱 UI 与 DBX 宿主通信；Host API 1.1 支持 `host/requestUserInput`，Host API 1.2 增加估算执行计划 API，Host API 1.3 增加表结构元数据和剪贴板读取，Host API 1.4 增加用户授权的只读数据查询，近期 Host API 增加 AI 模型发现/文本生成、Workbench 命令调用和文件夹拖放能力 |
+| Host API 1.x | `window.dbxPlugin` / Sidecar callback | 沙箱 UI 与 DBX 宿主通信；Host API 1.1 支持 `host/requestUserInput`，Host API 1.2 增加估算执行计划 API，Host API 1.3 增加表结构元数据和剪贴板读取，Host API 1.4 增加用户授权的只读数据查询，近期 Host API 还提供贡献点 identity、桌面浮动窗口/关闭、AI 流式生成、剪贴板图片与媒体流；新增能力需运行时探测 |
 | Sidecar Protocol v1 | stdin/stdout JSON-RPC | 可选原生后端与 DBX 通信 |
 | 包格式 | `.dbxp`（ZIP 容器） | DBX 实际安装的东西 |
 
@@ -68,7 +68,7 @@ SDK **不需要启动**：没有常驻 SDK Server。开发时只用三类工具�
 | --- | --- |
 | 写/改 `manifest.json`、权限、入口、`localizations` | `references/manifest.md` |
 | 加连接表单、工作台、文件系统、右键菜单、结果视图、命令、菜单和 MCP 工具面 | `references/contributions.md` |
-| 写沙箱 UI、调 `window.dbxPlugin`、主题适配、CSP/网络 | `references/host-api.md` |
+| 写沙箱 UI、浮动窗口、贡献点路由、AI/媒体流、主题/CSP/全屏 | `references/host-api.md` |
 | 写 Rust/Go Sidecar、连接生命周期、二进制帧 | `references/sidecar-protocol.md` |
 | 用 `dbx-plugin` 命令、装 CLI、模板选择 | `references/cli.md` |
 | 起 dev host 调试、看日志、诊断接口 | `references/debugging.md` |
@@ -107,6 +107,7 @@ dbx-plugin create my-plugin \
 
 ### 步骤 2：开发
 
+- 共用 UI 入口时，在 `await dbxPlugin.ready` 后读取 `contributionId` 路由；context 与身份独立。桌面小组件复用 `workbench`，通过 `floating.open` 打开，需 `host.workbench` 与 `capabilities.floating`，不新增 Manifest 类型；`surface` 可为 `tab`、`dock` 或 `window`。详见 `references/host-api.md`。
 - 前端入口由 `entrypoints.ui.entry` 指定，必须落在 `ui.root` 内（root 为 `ui` 时写 `ui/index.html`）。
 - 所有 UI 必须构建为包内静态资源；**不要把 Vite dev server 或 CDN 地址写进发行包**。
 - 需要原生能力（S3/SSH/系统凭据/长连接/高性能）才写 Sidecar。Sidecar 不是 OS 沙箱，以当前用户权限运行。
@@ -131,7 +132,7 @@ dbx-plugin package .
 # 原生：dist/<id>-<ver>-<os>-<arch>.dbxp + .artifact.json（必须在对应平台构建）
 ```
 
-`.dbxp` 内含 `checksums.json`，除该文件和签名文件外的每个条目都必须恰好有 SHA-256；正式安装要求受信任仓库签名，未签名包只在显式开发安装开关下接受。已安装版本不可原地覆盖，DBX 通过激活记录支持回滚。
+`.dbxp` 内含 `checksums.json`，除该文件和签名文件外的每个条目都必须恰好有 SHA-256；正式安装要求受信任仓库签名，未签名包只在显式开发安装开关下接受。正式签名版本不可原地覆盖，DBX 通过激活记录支持回滚；显式允许的本地未签名开发包可同版本重装。
 
 打包前先跑随附预检脚本（见 §5），它能提前发现 manifest/toml/include/资源不一致。
 
@@ -185,6 +186,7 @@ dbx-plugin package .
 - `.dbxp` 是安装包不是源码；不要把 `dist/` 当输入目录再次打包。
 - 打包会拒绝：符号链接、越界路径、`..`、`.dbx-dev`、超限文件、不安全输出位置。
 - 候选包**必须未签名**且 `.artifact.json` 里**不含 `signingKeyId`**；候选 URL 必须 HTTPS，且不能指向 `t8y2/dbx-store` 的 Release。
+- `release-candidates.json` 的 `plugin.permissions` 应来自 Manifest；商店优先使用非空的该列表，缺失或空列表会回退到商店元数据。权限全部删除时，务必同步 `.dbx-store.json.permissions: []`。
 - dbx-store 签名前会解包候选并逐项核对候选 `permissions` 与包内 `manifest.json.permissions`；新增或删除权限必须同时更新候选与包并递增版本。
 - 候选的 `id`/`version`/`publisher` 必须与包内 `manifest.json` 完全一致（签名时逐一比对）。
 - `plugins/*.json` 和 `catalog/index.json` **永远不要手工编辑**（由签名 Workflow 生成）。

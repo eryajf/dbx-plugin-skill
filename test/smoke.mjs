@@ -18,6 +18,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync
 import { tmpdir } from "node:os";
 import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { manifestFacts, readSnapshotSchema } from "../tools/upstream-drift.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const scripts = join(root, "skill", "scripts");
@@ -507,6 +508,7 @@ writeFileSync(
     check("候选 target url 是 HTTPS", /^https:\/\//.test(candidate.targets[0].url), candidate.targets[0].url);
     check("候选不含 signingKeyId", candidate.signingKeyId === undefined);
     check("候选不含 verified", candidate.verified === undefined);
+    check("无权限插件的 Release identity 显式输出空数组", Array.isArray(release.plugin.permissions) && release.plugin.permissions.length === 0);
     check("相对 icon 被改写为 HTTPS", /^https:\/\/raw\.githubusercontent\.com\//.test(candidate.icon), candidate.icon);
     check(
       "release-candidates 的 url 是纯文件名",
@@ -519,6 +521,23 @@ writeFileSync(
       JSON.stringify(release.artifacts[0]),
     );
   }
+}
+
+{
+  const dir = join(work, "candidate-permissions");
+  const manifest = makeProject({ dir });
+  manifest.permissions = ["host.workbench", "host.events"];
+  writeFileSync(join(dir, "manifest.json"), JSON.stringify(manifest));
+  makePackage({ distDir: join(dir, "dist"), id: manifest.id, version: manifest.version, target: "universal", manifest });
+  const args = [join(scripts, "make-candidate.mjs"), dir, "--repo", "example/demo", "--tag", "v0.1.0", "--json"];
+  const result = run(args);
+  const output = JSON.parse(result.stdout);
+  check("Release identity 与候选均携带 Manifest 权限", result.status === 0
+    && JSON.stringify(output.releaseCandidates.plugin.permissions) === '["host.events","host.workbench"]'
+    && JSON.stringify(output.candidate.permissions) === JSON.stringify(output.releaseCandidates.plugin.permissions), result.stderr);
+  writeFileSync(join(dir, ".dbx-store.json"), JSON.stringify({ permissions: ["host.events"] }));
+  const stale = run(args);
+  check("拒绝与 Manifest 不一致的商店权限副本", stale.status === 1 && /permissions 必须与/.test(stale.stdout), stale.stdout);
 }
 
 {
@@ -620,6 +639,32 @@ const runInstaller = (args) =>
   const parsed = JSON.parse(result.stdout);
   check("doctor 输出结构化结果", Array.isArray(parsed.checks) && parsed.checks.length >= 4, result.stdout.slice(0, 200));
   check("doctor 检出 skill 未安装", parsed.checks.some((c) => c.name.includes("DeepSeek") && c.level === "warn"));
+}
+
+// ------------------------------------------------------- 上游事实提取与快照完整性
+
+section("上游漂移检查");
+{
+  const schema = {
+    properties: { contributions: { items: { oneOf: [
+      { $ref: "#/$defs/workbenchContribution" },
+      { properties: { type: { const: "mcp" } } },
+    ] } } },
+    $defs: { workbenchContribution: { properties: { type: { const: "workbench" } } } },
+  };
+  check("贡献点事实同时解析 $ref 与内联定义", JSON.stringify(manifestFacts(schema).contributionTypes) === '["mcp","workbench"]');
+  const snapshot = join(work, "snapshot");
+  mkdirSync(join(snapshot, "dbx", "plugins"), { recursive: true });
+  const path = "plugins/manifest.schema.json";
+  const text = JSON.stringify(schema);
+  const sha256 = createHash("sha256").update(text).digest("hex");
+  writeFileSync(join(snapshot, "dbx", path), text);
+  writeFileSync(join(snapshot, "report.json"), JSON.stringify({ sources: { dbx: { commit: "test-commit", files: [{ path, sha256 }] } } }));
+  check("读取与报告哈希一致的快照", readSnapshotSchema(snapshot, "dbx", path).sha256 === sha256);
+  writeFileSync(join(snapshot, "dbx", path), "{}");
+  let rejected = false;
+  try { readSnapshotSchema(snapshot, "dbx", path); } catch (error) { rejected = /快照文件已变化/.test(error.message); }
+  check("拒绝同步后被改动的快照", rejected);
 }
 
 // ------------------------------------------------------- 汇总

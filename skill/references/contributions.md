@@ -174,6 +174,8 @@ SSH 作为最后一层时，路由是该跳板的动态 SOCKS5 端点；配置 S
 
 - 打开工作台时把 context 以 **2 MiB 内的 JSON 快照**传给插件（递归去除 Vue 响应式包装）。
 - 切换 Tab 时 iframe 保留（不重载），所以插件 UI 状态可跨导航保留。
+- 多个贡献点共用 UI 入口时，在 `await dbxPlugin.ready` 后读取 `dbxPlugin.contributionId`；它不是 context 字段。
+- 已声明的 workbench 可通过 `floating.open` 在桌面独立窗口中显示（`surface: "window"`），需 `host.workbench` 和 `capabilities.floating`；不增加 Manifest contribution 类型。窗口与 tab/dock 是不同 UI 实例，见 `host-api.md`。
 
 ---
 
@@ -216,7 +218,7 @@ SSH 作为最后一层时，路由是该跳板的动态 SOCKS5 端点；配置 S
 }
 ```
 
-`enablement` 可声明命令可用条件，由宿主决定当前上下文是否可执行。插件不应假设不兼容的 DBX 版本会显示该命令。工作台 UI 也可以调用 `dbxPlugin.executeCommand(commandId, context?)`；宿主会再次检查 `enablement`、合并调用方 context 并剥离 `workbenchId`、`restored`、`surface` 等保留字段。未知命令或被禁用命令通过 `{ error }` 返回。宿主上下文中的 `surface: "dock"` 表示底部停靠面板，`surface: "tab"` 表示主工作区标签页；插件不要再把旧的 `panel` surface 值当作稳定契约。
+`enablement` 可声明命令可用条件，由宿主决定当前上下文是否可执行。插件不应假设不兼容的 DBX 版本会显示该命令。工作台 UI 也可以调用 `dbxPlugin.executeCommand(commandId, context?)`；宿主会再次检查 `enablement`、合并调用方 context 并剥离 `workbenchId`、`restored`、`surface` 等保留字段。未知命令或被禁用命令通过 `{ error }` 返回。宿主上下文中的 `surface: "dock"` 表示底部停靠面板，`surface: "tab"` 表示主工作区标签页，`surface: "window"` 表示桌面浮动窗口；插件不要再把旧的 `panel` surface 值当作稳定契约。
 
 dock command 的 `open-workbench` action 还可以声明 `options_action: "<sidecar method>"`，由 Sidecar 根据当前 locale 返回启动选项：
 
@@ -346,8 +348,8 @@ Sidecar 收到 `{ "locale": "zh-CN" }`，返回 `{ "entries": [{ "label": "zsh",
 { "type": "result-view", "id": "com.example.graph", "label": "Graph" }
 ```
 
-- 在结果网格旁加一个工具栏按钮；点击后用当前结果作为 context 打开**本插件的 workbench**（因此需要 UI 入口）。
-- `context.result` 是**有界快照**：`{ columns, rows (≤ 500), truncated }`，外加 `sql`、`connectionId`、`database`。
+- 在结果网格旁加一个工具栏按钮；点击后用当前结果作为 context 打开该 result-view 的 UI。它只声明显示元数据，不需要命名或引用另一个 workbench，但需要 UI 入口。多个视图在 UI 中根据 `dbxPlugin.contributionId` 路由。
+- `context.result` 是**有界快照**：`{ columns, rows (≤ 500), truncated }`，外加 `sql`、`connectionId`、`database`、`schema`；可选身份缺失时保持缺省，不伪造空字符串。
 - 需要更多结果行时，可用 `sql` + 连接引用调用 Host API `queryData`，但必须声明 `host.data:read`，取得用户对该连接的授权，并遵守单条只读语句及 5000 行上限；详见 `host-api.md`。需要更大规模或流式读取时仍需自己的后端。
 
 ## 8. `mcp`

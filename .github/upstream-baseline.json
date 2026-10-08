@@ -1,5 +1,5 @@
 {
-  "checkedAt": "2026-09-30T16:06:45.456Z",
+  "checkedAt": "2026-10-08T12:24:15.919Z",
   "sources": {
     "manifestSchema": {
       "url": "https://raw.githubusercontent.com/t8y2/dbx/main/plugins/manifest.schema.json",
@@ -78,7 +78,16 @@
           "stdio-framed",
           "stdio-jsonl"
         ],
-        "contributionTypes": [],
+        "contributionTypes": [
+          "command",
+          "connection-provider",
+          "context-menu",
+          "filesystem-provider",
+          "mcp",
+          "menus",
+          "result-view",
+          "workbench"
+        ],
         "filesystemCapabilities": [
           "delete",
           "mkdir",

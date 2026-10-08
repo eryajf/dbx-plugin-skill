@@ -115,7 +115,7 @@ node skill/scripts/dev-logs.mjs --port 5190 [--level error] [--follow] [--json]
 ```bash
 git clone https://github.com/eryajf/dbx-plugin-skill.git
 cd dbx-plugin-skill
-npm test                      # 运行 65 项端到端自检
+npm test                      # 运行端到端自检
 
 # 以符号链接方式边改边用
 node bin/dbx-plugin-skill.mjs install --link --target dsh
@@ -132,6 +132,7 @@ npm run upstream:check        # 对比上游 DBX 契约是否变化
 npm run upstream:update       # 更新后重新基线化
 npm run upstream:sync         # 只同步清单中的上游文件/目录到 tmp/upstream
 npm run upstream:report       # 查看最近一次稀疏快照的提交与文件哈希
+npm run upstream:check -- --snapshot  # 对本次同步文件核验哈希并检查漂移（npm 版本仍在线查询）
 ```
 
 ---
@@ -204,7 +205,7 @@ git push --follow-tags       # 推送提交与 tag → 自动触发 release.yml
 
 然后**从仓库删掉 `NPM_TOKEN`**，`release.yml` 会自动走 OIDC，不再有 token 过期问题。
 
-要求：npm CLI ≥ 11.5.1 且 Node ≥ 22.14.0（`release.yml` 已 `npm install -g npm@latest`）。仅支持 GitHub 托管 runner，自建 runner 不支持。
+要求：npm CLI ≥ 11.5.1 且 Node ≥ 22.14.0（`release.yml` 已固定安装 `npm@^11.5.1`）。仅支持 GitHub 托管 runner，自建 runner 不支持。
 
 `release.yml` 会先判断 `NPM_TOKEN` 是否存在：有就用 token，没有就走 OIDC —— 两种配置都能跑，可平滑迁移；发布失败时会额外打印常见原因提示。
 
@@ -220,7 +221,7 @@ skill 大量记录 DBX 的**契约细节**（字段枚举、权限语法、协�
 
 需要逐项核对实现、文档或 Workflow 时运行 `npm run upstream:sync`。它对 `t8y2/dbx` 使用
 Git partial clone + sparse checkout，只下载 `tools/upstream-sources.json` 中列出的 schema、
-插件开发文档和 SDK 子目录；`t8y2/dbx-store` 则使用 depth=1 全量浅克隆。内容保存到本地
+插件开发文档、SDK 子目录，以及核对 Host API 所需的桥接/窗口/媒体实现；`t8y2/dbx-store` 则使用 depth=1 全量浅克隆。内容保存到本地
 `tmp/upstream/`，不会进入提交或 npm 包。重复执行只 fetch 两个仓库的最新 `main`，并生成带
 commit 与 SHA-256 的快照报告。
 
@@ -235,6 +236,10 @@ npm run upstream:update
 需要扩大或缩小同步范围时，只修改 `tools/upstream-sources.json`，无需复制上游源码。
 
 ---
+
+## 最近一次官方对齐
+
+2026-10-08 对齐至 DBX `504ef7e1c6f5156b792a5a63348ce95d5db58df0` 与 dbx-store `0458930a41274b69c9d55162722a2ffe36df77f1`。补充桌面浮动窗口、贡献点 identity、关闭接口、全屏/图形引擎和此前遗漏的 AI/媒体能力；修正商店 URL、publisher 与权限同步说明。详见 [逐项对齐记录](docs/upstream-alignment-2026-10-08.md)。
 
 ## 更新已安装的 skill
 

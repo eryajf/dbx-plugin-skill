@@ -6,6 +6,7 @@
  *   node tools/upstream-drift.mjs --json     # 机器可读
  *   node tools/upstream-drift.mjs --markdown # 适合作为 issue 正文
  *   node tools/upstream-drift.mjs --update   # 把当前上游状态写入基线
+ *   node tools/upstream-drift.mjs --snapshot # 校验本次同步快照（npm 版本仍在线查询）
  *
  * 监控:
  *   - t8y2/dbx 的 plugins/manifest.schema.json（sha256 + 关键契约事实）
@@ -52,7 +53,7 @@ async function fetchCliVersion() {
 }
 
 /** 从 manifest schema 提取本 skill 依赖的关键契约事实 */
-function manifestFacts(schema) {
+export function manifestFacts(schema) {
   const properties = schema?.properties ?? {};
   const defs = schema?.$defs ?? {};
   const contributions = schema?.properties?.contributions?.items?.oneOf ?? [];
@@ -83,6 +84,7 @@ function manifestFacts(schema) {
       ? [...defs.backendEntrypoint.properties.transport.enum].sort()
       : null,
     contributionTypes: contributions
+      .map((branch) => branch.$ref?.startsWith("#/$defs/") ? defs[branch.$ref.slice("#/$defs/".length)] : branch)
       .map((branch) => branch?.properties?.type?.const)
       .filter(Boolean)
       .sort(),
@@ -102,10 +104,22 @@ function candidateFacts(schema) {
   };
 }
 
+export function readSnapshotSchema(directory, name, path) {
+  const report = JSON.parse(readFileSync(join(directory, "report.json"), "utf8"));
+  const source = report.sources?.[name];
+  const expected = source?.files?.find((file) => file.path === path);
+  if (!source?.commit || !expected) throw new Error(`快照缺少 ${name}/${path}，请先运行 npm run upstream:sync`);
+  const text = readFileSync(join(directory, name, path), "utf8");
+  const sha256 = createHash("sha256").update(text).digest("hex");
+  if (sha256 !== expected.sha256) throw new Error(`快照文件已变化: ${name}/${path}，请重新同步`);
+  return { text, json: JSON.parse(text), sha256 };
+}
+
 async function collect() {
+  const snapshot = join(root, "tmp", "upstream");
   const [manifest, candidate, cliVersion] = await Promise.all([
-    fetchJson(SOURCES.manifestSchema),
-    fetchJson(SOURCES.candidateSchema),
+    flag("--snapshot") ? readSnapshotSchema(snapshot, "dbx", "plugins/manifest.schema.json") : fetchJson(SOURCES.manifestSchema),
+    flag("--snapshot") ? readSnapshotSchema(snapshot, "dbx-store", "schemas/plugin-candidate.schema.json") : fetchJson(SOURCES.candidateSchema),
     fetchCliVersion(),
   ]);
   return {
@@ -250,7 +264,9 @@ async function main() {
   process.exit(drifts.length > 0 ? 1 : 0);
 }
 
-main().catch((error) => {
-  process.stderr.write(`未预期的错误: ${error.stack ?? error.message}\n`);
-  process.exit(2);
-});
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  main().catch((error) => {
+    process.stderr.write(`未预期的错误: ${error.stack ?? error.message}\n`);
+    process.exit(2);
+  });
+}

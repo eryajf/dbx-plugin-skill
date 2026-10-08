@@ -123,9 +123,9 @@ node <skill-root>/scripts/dev-logs.mjs --port 5190 --level error # 4) dev 运行
 
 | 报错 | 原因 | 修法 |
 | --- | --- | --- |
-| `Invalid candidate artifact '<v>'` | `release-candidates.json` 里 `artifacts[].url` 不是纯 `.dbxp` 文件名 | 改成纯文件名（自动同步脚本会自己拼 GitHub URL） |
+| `Invalid candidate artifact '<v>'` | 文件名非法，或完整 URL 不属于同仓库同 Release | 推荐纯 `.dbxp` 文件名，也可使用同仓库、同 Release 的完整 GitHub 下载 URL |
 | `No published candidate release found for <repo>` | 最新 Release 里没有名为 `release-candidates.json` 的资产，或 Release 是 draft/prerelease | 确认资产名精确、Release 已发布 |
-| `publisher '<p>' is not registered` | publisher 记录不在 base 分支（PR 里新增的会被签名 overlay 删掉） | **先把 publisher 记录合并进 main**，再跑 `/sign` |
+| `publisher '<p>' is not registered` | publisher 记录缺失或 ID 不一致 | 在同一个候选 PR 中加入 `publishers/<id>.json`；当前签名 overlay 会保留新增记录，已有 base 记录优先 |
 | `candidate URLs must not reference DBX Store releases; submit the unsigned candidate artifact` | 指向了官方已签名产物 | 指向你自己仓库的未签名包 |
 | `version '<v>' is already listed for plugin '<id>'` | 复用版本号 | 升版本 |
 | `'<f>' must be a non-empty string when provided` | `.dbx-store.json` 里有空字符串字段 | 删掉该字段或填值 |
@@ -149,6 +149,11 @@ node <skill-root>/scripts/dev-logs.mjs --port 5190 --level error # 4) dev 运行
 | 大文件上传失败 | 用了 4 MiB 上限的内联 `filesystem/write` | 改用 framed 分块传输 |
 | 插件出现在「已安装」但功能不可用 | 权限未声明或未重新连接 | 检查 Manifest 权限与实际调用是否一致 |
 | 正式签名包无法覆盖同版本重装 | 设计如此 | 本地开发用未签名包；正式包必须升版本 |
+| `contributionId` 未定义或 UI 路由错误 | 初始化前读取或旧宿主不支持 | 先 await ready，再读取 contributionId；不要从 context 推断身份 |
+| `Floating plugin windows require the desktop host` | Web/dev 或旧宿主没有窗口能力 | 检查 capabilities.floating，回退到 tab/dock |
+| 浮动窗口 executeCommand 报不可用 | 窗口没有主外壳命令执行面 | 用 openWorkbench/openFilesystem 转交主窗口 |
+| 全屏请求被拒绝 | 未委派 fullscreen 或缺少用户激活 | 检查 document.fullscreenEnabled，在用户动作中请求 |
+| WebGL 引擎报 unsafe-eval / new Function 错误 | 默认 CSP 禁止动态代码生成 | 由用户按插件开启宿主图形引擎授权；不要伪造 Manifest 权限 |
 | 卸载被拒绝 | 仍有已保存连接引用该插件 | 先删除相关连接 |
 
 ## 8. 快速定位手法

@@ -11,7 +11,7 @@
  *   <out>/release-candidates.json        插件 Release 的资产（artifacts[].url 为纯文件名）
  *
  * 关键规则（来自 dbx-store 脚本，写错必然被拒）:
- *   - release-candidates.json 的 artifacts[].url 必须是**纯 .dbxp 文件名**，不是 URL
+ *   - 本生成器统一输出纯 .dbxp 文件名；商店也接受同仓库、同 Release 的完整 GitHub URL
  *   - 候选的 targets[].url 必须是 **HTTPS**
  *   - 候选不能含 signingKeyId / verified
  *   - permissions 以 manifest.json 为准，并会与 .dbx-store.json 中的值比对
@@ -373,6 +373,7 @@ function main() {
       id,
       publisher,
       version,
+      permissions: manifestPermissions,
       ...(candidate.name !== undefined ? { name: candidate.name } : {}),
       ...(candidate.description !== undefined ? { description: candidate.description } : {}),
     },
@@ -382,7 +383,7 @@ function main() {
     if (!/^[A-Za-z0-9._-]+\.dbxp$/.test(artifact.url)) {
       error(
         `release-candidates 的 artifacts[].url 必须是纯 .dbxp 文件名（当前 ${JSON.stringify(artifact.url)}）` +
-          " —— 商店脚本用 basename + 正则校验后自行拼接 GitHub Release URL",
+          " —— 本生成器使用纯文件名输出，商店同步器也接受同仓库、同 Release 的完整 GitHub URL",
       );
     }
   }
@@ -417,7 +418,7 @@ function main() {
     note(`  targets: ${targets.map((t) => t.target).join(", ")}`);
     note(`\n下一步:`);
     note(`  1) 把 ${basename(releasePath)} 与各 .dbxp / .artifact.json 上传到同一个 GitHub Release`);
-    note(`  2) 把 candidates/${id}.json 放到 dbx-store 的 PR 中（首次还需 publishers/${publisher}.json，且需先合并进 main）`);
+    note(`  2) 把 candidates/${id}.json 放到 dbx-store 的 PR 中（首次在同一个 PR 中加入 publishers/${publisher}.json）`);
   }
 
   process.exit(0);

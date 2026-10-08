@@ -15,7 +15,17 @@
       "plugins/sdk/packager",
       "plugins/sdk/dev-host",
       "plugins/sdk/rust",
-      "plugins/sdk/go"
+      "plugins/sdk/go",
+      ".github/workflows/plugin-release-reusable.yml",
+      "apps/desktop/src/lib/plugins/pluginHostBridge.ts",
+      "apps/desktop/src/lib/plugins/pluginFloatingWindow.ts",
+      "apps/desktop/src/components/plugins/PluginWorkbenchHost.vue",
+      "apps/desktop/src/components/plugins/PluginFloatingWindow.vue",
+      "apps/desktop/src/components/plugins/PluginWorkbenchTab.vue",
+      "apps/desktop/src/lib/plugins/pluginGraphicsEngine.ts",
+      "apps/desktop/src/lib/plugins/pluginAiCompletion.ts",
+      "src-tauri/src/plugin_ui_protocol.rs",
+      "src-tauri/src/commands/plugin_media.rs"
     ]
   },
   "dbx-store": {
