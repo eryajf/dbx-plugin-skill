@@ -230,4 +230,4 @@ CLICOLOR_FORCE=1 dbx-plugin --help  # 管道输出时也保留颜色
 
 ## 9. 源码支持与已发布 CLI 的边界
 
-2026-10-08 核对的 npm 最新 CLI 仍为 `0.1.9`。本 skill 对 Host/dev-host 新能力的说明基于 DBX `504ef7e1c6f5156b792a5a63348ce95d5db58df0` 的 main 源码，不代表该提交的 dev-host 已进入 npm 包。若已安装的 dev 不提供 `contributionId`，不要从空 context 猜测；确认匹配版本的发布情况，或在 SDK 开发时使用已构建的源码运行时。浮动窗口、剪贴板图片、媒体和 AI 流式生成需要真实 DBX，不能靠升级 CLI 模拟。
+2026-10-19 核对的 npm 最新 CLI 仍为 `0.1.9`。本 skill 对 Host/dev-host 新能力的说明基于 DBX `cb4406c715bc778d101f7ca3c9f8737b53392071` 的 main 源码，不代表该提交的 dev-host 已进入 npm 包。若已安装的 dev 不提供 `contributionId`、工作台标题或连接列表，不要从空 context 猜测；确认匹配版本的发布情况，或在 SDK 开发时使用已构建的源码运行时。浮动窗口、剪贴板图片、媒体和 AI 流式生成需要真实 DBX，不能靠升级 CLI 模拟。

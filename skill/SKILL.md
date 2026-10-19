@@ -16,7 +16,7 @@ description: DBX 插件开发全流程。Use when 创建、开发、调试、打
 | --- | --- | --- |
 | Manifest v1 | `manifest.json` | 插件身份、权限、入口、贡献点、国际化。运行时契约，**拒绝未声明字段** |
 | 构建配置 | `dbx-plugin.toml` | 打包包含哪些目录、是否有原生后端、dev 构建命令。**不进入插件包** |
-| Host API 1.x | `window.dbxPlugin` / Sidecar callback | 沙箱 UI 与 DBX 宿主通信；Host API 1.1 支持 `host/requestUserInput`，Host API 1.2 增加估算执行计划 API，Host API 1.3 增加表结构元数据和剪贴板读取，Host API 1.4 增加用户授权的只读数据查询，近期 Host API 还提供贡献点 identity、桌面浮动窗口/关闭、AI 流式生成、剪贴板图片与媒体流；新增能力需运行时探测 |
+| Host API 1.x | `window.dbxPlugin` / Sidecar callback | 沙箱 UI 与 DBX 宿主通信；Host API 1.1 支持 `host/requestUserInput`，Host API 1.2 增加估算执行计划 API，Host API 1.3 增加表结构元数据和剪贴板读取，Host API 1.4 增加用户授权的只读数据查询，近期 Host API 还提供贡献点 identity、工作台标题、脱敏连接列表、桌面浮动窗口/关闭、AI 流式生成、剪贴板图片与媒体流；新增能力需运行时探测 |
 | Sidecar Protocol v1 | stdin/stdout JSON-RPC | 可选原生后端与 DBX 通信 |
 | 包格式 | `.dbxp`（ZIP 容器） | DBX 实际安装的东西 |
 
@@ -172,9 +172,9 @@ dbx-plugin package .
 - `command` 贡献点的 `action.workbench` 必须引用同一 Manifest 中的 `workbench`；`action.presentation` 只能是 `tab` 或 `panel`，`reuse` 只能是 `singleton` 或 `new`，`instance_key` / `options_action` 必须是非空字符串。Workbench 内调用 `executeCommand` 仍需 `host.workbench`，预期失败通过 `{ error }` 返回；宿主 context 的底部停靠 surface 使用 `dock`（旧的 `panel` surface 值不再是稳定契约）。`menus.items[].command` 应引用已声明的命令，位置只能是 `commandPalette`、`appToolbar` 或 `appSidebar`。`context-menu.dynamic` 必须是布尔值，且为 `true` 时必须有 backend entrypoint；动态返回项只允许一层子菜单。`mcp` contribution 仅需 `type` 与 `id`，可选 `description`、`ai_tools`（默认 `true`）和 `external_tools`（默认 `false`）；每个 Manifest 最多一个，且必须有 backend entrypoint。
 
 **权限**
-- 只声明真正用到的权限，取最小集合：`host.workbench`、`host.events`、`host.filesystem`、`host.binary`、`host.plans:read`、`host.schema:read`、`host.storage`、`host.ai`、`host.clipboard:read`、`host.data:read`、`host.network:https://host[:port]`（HTTPS、无路径/通配符/Token，最多 8 个）。`host.plans:read` 仅开放宿主生成的估算执行计划读取；`host.schema:read` 仅开放已打开连接中单个 table 的窄化结构元数据；`host.data:read` 仅开放用户授权连接上的单条只读 SQL。
+- 只声明真正用到的权限，取最小集合：`host.workbench`、`host.events`、`host.filesystem`、`host.binary`、`host.plans:read`、`host.schema:read`、`host.storage`、`host.ai`、`host.clipboard:read`、`host.data:read`、`host.connections:read`、`host.network:https://host[:port]`（HTTPS、无路径/通配符/Token，最多 8 个）。`host.plans:read` 仅开放宿主生成的估算执行计划读取；`host.schema:read` 仅开放已打开连接中单个 table 的窄化结构元数据；`host.data:read` 仅开放用户授权连接上的单条只读 SQL；`host.connections:read` 仅开放脱敏连接摘要。
 - `host.network` 只影响浏览器 CSP 的 `connect-src`，**不是** Sidecar 的网络防火墙，也仍受目标服务 CORS 约束。
-- 估算执行计划 API 属于 Host API 1.2：需要 `host.plans:read`，并同时检查初始化能力 `capabilities.planApi` 与连接级支持；若插件无法在缺少该能力时工作，在 `engines.host_api` 声明 `^1.2`。表结构元数据与剪贴板读取属于 Host API 1.3；只读数据查询属于 Host API 1.4，需分别检查 `schemaMetadataApi`、`clipboardRead`、`dataApi`，并在无法降级时声明相应的 `engines.host_api` 下限。工作台持久化小状态使用 `host.storage` 与 `window.dbxPlugin.storage`（单值 256 KiB、插件总量 1 MiB），并检查初始化能力 `capabilities.storage`。需要把数据快照交给 DBX 内置 AI 面板时声明 `host.ai`，调用 `window.dbxPlugin.ai.openConversation` 前检查 `capabilities.ai`；需要模型列表或纯文本生成时分别检查 `aiModelDiscovery`、`aiCompletion`，宿主确认后只返回脱敏模型项和纯文本，不暴露凭据、不启用工具或文件写入。旧宿主缺少这些能力时应优雅降级。
+- 估算执行计划 API 属于 Host API 1.2：需要 `host.plans:read`，并同时检查初始化能力 `capabilities.planApi` 与连接级支持；若插件无法在缺少该能力时工作，在 `engines.host_api` 声明 `^1.2`。表结构元数据与剪贴板读取属于 Host API 1.3；只读数据查询属于 Host API 1.4，需分别检查 `schemaMetadataApi`、`clipboardRead`、`dataApi`，并在无法降级时声明相应的 `engines.host_api` 下限。连接枚举需要 `host.connections:read` 与 `capabilities.connectionsApi`，只返回脱敏摘要；工作台标题需要 `host.workbench` 与 `capabilities.workbenchTitle`。工作台持久化小状态使用 `host.storage` 与 `window.dbxPlugin.storage`（单值 256 KiB、插件总量 1 MiB），并检查初始化能力 `capabilities.storage`。需要把数据快照交给 DBX 内置 AI 面板时声明 `host.ai`，调用 `window.dbxPlugin.ai.openConversation` 前检查 `capabilities.ai`；需要模型列表或纯文本生成时分别检查 `aiModelDiscovery`、`aiCompletion`，宿主确认后只返回脱敏模型项和纯文本，不暴露凭据、不启用工具或文件写入。旧宿主缺少这些能力时应优雅降级。
 - Workbench 的 `ai.recommendations` 最多 5 条；运行时用 `ai.setRecommendations` 覆盖默认项或用 `ai.clearRecommendations` 清空。`label` / `prompt` 支持从 context 读取的 `{{path.to.value}}` 占位符，无法解析或包含原型污染路径的推荐会被隐藏；调用前检查 `capabilities.aiRecommendations`。
 
 **安全**

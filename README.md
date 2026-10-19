@@ -239,7 +239,7 @@ npm run upstream:update
 
 ## 最近一次官方对齐
 
-2026-10-08 对齐至 DBX `504ef7e1c6f5156b792a5a63348ce95d5db58df0` 与 dbx-store `0458930a41274b69c9d55162722a2ffe36df77f1`。补充桌面浮动窗口、贡献点 identity、关闭接口、全屏/图形引擎和此前遗漏的 AI/媒体能力；修正商店 URL、publisher 与权限同步说明。详见 [逐项对齐记录](docs/upstream-alignment-2026-10-08.md)。
+2026-10-19 对齐至 DBX `cb4406c715bc778d101f7ca3c9f8737b53392071` 与 dbx-store `4f64d038405a2c31e631c7e340408a860ab34bf9`。补充脱敏连接列表、工作台标题 API、Manifest 顶层 capabilities 形状和 dev host 32 MiB 资源上限；dbx-store 候选 Schema、校验脚本与 Workflow 未变化。详见 [逐项对齐记录](docs/upstream-alignment-2026-10-19.md)。
 
 ## 更新已安装的 skill
 

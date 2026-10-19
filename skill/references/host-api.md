@@ -29,7 +29,7 @@ const locale = window.dbxPlugin.locale;
 | `onContext(fn)` | 监听 context 变化，返回取消订阅函数 | — |
 | `locale` | 当前语言（`en`、`zh-CN` 等） | — |
 | `theme` | `{ appearance: "light" \| "dark", tokens }` | — |
-| `capabilities` | 初始化消息公布的 `downloadFile`、`planApi`、`schemaMetadataApi`、`dataApi`、`storage`、`ai`、`aiModelDiscovery`、`aiCompletion`、`aiRecommendations`、`aiCompletionStream`、`clipboardWrite`、`clipboardRead`、`clipboardImageRead`、`mediaUrl`、`floating`、`fileTransfer` 等能力位 | — |
+| `capabilities` | 初始化消息公布的 `downloadFile`、`planApi`、`schemaMetadataApi`、`dataApi`、`connectionsApi`、`storage`、`ai`、`aiModelDiscovery`、`aiCompletion`、`aiRecommendations`、`aiCompletionStream`、`clipboardWrite`、`clipboardRead`、`clipboardImageRead`、`mediaUrl`、`floating`、`workbenchTitle`、`fileTransfer` 等能力位 | — |
 | `request(method, params)` | 调用 **Host API** | — |
 | `invoke(method, params, { timeoutMs })` | 调用**自己 Sidecar** 的 RPC（有响应） | — |
 | `notify(method, params)` | 向自己 Sidecar 发通知（无业务返回值） | — |
@@ -38,6 +38,7 @@ const locale = window.dbxPlugin.locale;
 | `readAsset(path)` | 读取包内资源 | — |
 | `readAssetUrl(path)` | 读取包内资源并返回对象 URL | — |
 | `openWorkbench(id, context, options?)` | 打开本插件另一个工作台；dock 面板可用 `target: "tab"` 请求主工作台标签页 | `host.workbench` |
+| `setTitle(title)` / `getTitle()` | 修改或读取当前工作台 tab/dock 标题；传入 `null` 恢复默认标题 | `host.workbench` |
 | `closeWorkbench()` | 请求关闭当前 tab/dock/window，与 Ctrl/Cmd+W 同一路径；不返回关闭完成的 Promise | — |
 | `floating.open(options)` | 打开同插件 workbench 的桌面浮动窗口，需检查 `capabilities.floating` | `host.workbench` |
 | `floating.close(id?)` / `beginDrag()` / `endDrag(options?)` / `setSize(w, h)` | 关闭本插件窗口或控制当前浮动窗口几何；见下文 | — |
@@ -46,6 +47,7 @@ const locale = window.dbxPlugin.locale;
 | `getPlanCapabilities(connectionId)` / `explainPlan(request)` | 读取指定连接的估算执行计划 | `host.plans:read` |
 | `getTableMetadata({ connectionId, database?, schema?, table })` | 读取已打开连接中单个 table 的窄化结构元数据 | `host.schema:read` |
 | `queryData({ connectionId, database?, schema?, sql, maxRows?, timeoutMs? })` | 在用户已授权的连接上执行单条只读 SQL | `host.data:read` |
+| `getConnections()` / `connections.list()` | 读取已配置连接的脱敏摘要；`getConnections` 需要显式连接读取权限 | `host.connections:read` |
 | `copy(text)` / `clipboard.writeText(text)` | 写入系统剪贴板 | — |
 | `clipboard.readImage()` | 读取 PNG 图片，失败会 reject；检查 `clipboardImageRead` | `host.clipboard:read` |
 | `clipboard.readText()` | 读取系统剪贴板 | `host.clipboard:read` |
@@ -64,6 +66,33 @@ const locale = window.dbxPlugin.locale;
 
 常用 Host 内部方法（通过 `request` 调用）：`host.getContext`、`ui.readAsset`。
 **只调用协议中声明的方法**，不要调用未公开的 DBX 内部函数。
+
+### 工作台标题与连接列表
+
+工作台可以在用户动作或连接切换后更新自己的 tab/dock 标题：
+
+```js
+await window.dbxPlugin.ready;
+if (window.dbxPlugin.capabilities.workbenchTitle) {
+  await window.dbxPlugin.setTitle("Logs · production");
+  const current = await window.dbxPlugin.getTitle();
+}
+```
+
+`setTitle(null)` 恢复宿主默认标题；标题由宿主限制在 256 字符内，并且只作用于承载当前调用方的 surface。浮动窗口或侧边栏没有标题 API 时，能力位会缺失，插件应保留默认标题。
+
+需要让用户选择连接的插件应声明 `host.connections:read`，等待 `ready` 后读取 `connectionsApi`：
+
+```js
+await window.dbxPlugin.ready;
+if (window.dbxPlugin.capabilities.connectionsApi) {
+  const connections = await window.dbxPlugin.getConnections();
+  // 也可使用 window.dbxPlugin.connections.list()
+  render(connections.map(({ id, name, dialect, connected }) => ({ id, name, dialect, connected })));
+}
+```
+
+返回项只包含 `id`、`name`、`dialect`/`dbType`、连接状态、`readOnly` 以及可用时的默认 `database`/`schema`；不会包含密码、用户名、主机、端口或连接串。该 API 只枚举当前配置，不会替插件建立连接。上游桥仍保留 `host.workbench` 下的受限 provider 范围查询，用于兼容未声明全量读取权限的旧插件。
 
 计划 API 仅支持宿主允许的只读估算模式；实际执行计划和会产生副作用的语句会被宿主拒绝。初始化消息中的 `capabilities.planApi` 为假或缺失时，应隐藏相关 UI，而不是用请求试探能力。
 

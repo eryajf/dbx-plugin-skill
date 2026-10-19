@@ -292,6 +292,33 @@ const goodManifest = makeProject({ dir: goodDir });
   check("--json 输出可解析的 JSON", parsed !== null && parsed.ok === true, result.stdout.slice(0, 200));
 }
 
+{
+  const capabilityManifest = { ...goodManifest, capabilities: [{ id: "vendor.preview", label: "Preview support", kind: "feature" }] };
+  writeFileSync(join(goodDir, "manifest.json"), `${JSON.stringify(capabilityManifest, null, 2)}\n`);
+  const result = run([join(scripts, "check-project.mjs"), goodDir, "--json"]);
+  const parsed = JSON.parse(result.stdout);
+  check("Manifest 顶层 capabilities 通过预检", result.status === 0 && parsed.ok === true, result.stdout.slice(0, 500));
+  const invalid = { ...capabilityManifest, capabilities: [{ id: "Bad Capability", label: "" }] };
+  writeFileSync(join(goodDir, "manifest.json"), `${JSON.stringify(invalid, null, 2)}\n`);
+  const rejected = run([join(scripts, "check-project.mjs"), goodDir, "--json"]);
+  const rejectedParsed = JSON.parse(rejected.stdout);
+  const messages = rejectedParsed.findings.map((finding) => finding.message).join("\n");
+  check("Manifest 顶层 capabilities 形状错误被拒绝", rejected.status === 1 && messages.includes("capabilities[0].id") && messages.includes("capabilities[0].label"), messages);
+  writeFileSync(join(goodDir, "manifest.json"), `${JSON.stringify(goodManifest, null, 2)}\n`);
+}
+
+{
+  const connectionsManifest = { ...goodManifest, permissions: ["host.connections:read"] };
+  writeFileSync(join(goodDir, "manifest.json"), `${JSON.stringify(connectionsManifest, null, 2)}\n`);
+  const result = run([join(scripts, "check-project.mjs"), goodDir, "--json"]);
+  check("host.connections:read 权限通过预检", result.status === 0, result.stdout.slice(0, 500));
+  const legacy = { ...goodManifest, permissions: ["host.connections::read"] };
+  writeFileSync(join(goodDir, "manifest.json"), `${JSON.stringify(legacy, null, 2)}\n`);
+  const legacyResult = run([join(scripts, "check-project.mjs"), goodDir, "--json"]);
+  check("兼容历史 host.connections::read 拼写", legacyResult.status === 0, legacyResult.stdout.slice(0, 500));
+  writeFileSync(join(goodDir, "manifest.json"), `${JSON.stringify(goodManifest, null, 2)}\n`);
+}
+
 const mcpDir = join(work, "mcp");
 mkdirSync(join(mcpDir, "bin", "darwin-arm64"), { recursive: true });
 mkdirSync(join(mcpDir, "backend"), { recursive: true });

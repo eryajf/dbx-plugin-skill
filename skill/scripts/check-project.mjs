@@ -30,15 +30,17 @@ const MANIFEST_TOP_FIELDS = [
   "engines",
   "permissions",
   "entrypoints",
+  "capabilities",
   "contributions",
   "localizations",
 ];
 
-const STATIC_PERMISSIONS = ["host.events", "host.binary", "host.workbench", "host.filesystem", "host.plans:read", "host.schema:read", "host.storage", "host.ai", "host.clipboard:read", "host.data:read"];
+const STATIC_PERMISSIONS = ["host.events", "host.binary", "host.workbench", "host.filesystem", "host.plans:read", "host.schema:read", "host.storage", "host.ai", "host.clipboard:read", "host.data:read", "host.connections:read", "host.connections::read"];
 const NETWORK_PERMISSION = /^host\.network:https:\/\/[A-Za-z0-9._-]+(?::[0-9]+)?$/;
 const MAX_NETWORK_PERMISSIONS = 8;
 
 const IDENTIFIER = /^[a-z0-9][a-z0-9._-]*$/;
+const CAPABILITY_ID = /^[a-z0-9][a-z0-9._:-]*$/;
 const SEMVER = /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
 const FIELD_TYPES = ["text", "password", "number", "boolean", "select", "radio", "textarea"];
 const BINDINGS = ["config", "secret", "name", "host", "port", "username", "password", "database"];
@@ -251,6 +253,30 @@ function checkManifest(dir, manifest) {
       "$schema 指向的 ref plugin-sdk-v1 不存在（HTTP 404）",
       "改为 https://raw.githubusercontent.com/t8y2/dbx/main/plugins/manifest.schema.json 或具体版本 tag。",
     );
+  }
+
+  // Optional top-level capability declarations are schema metadata. The
+  // public runtime docs do not assign additional behavior to them yet, so
+  // validate only the published shape and do not infer security semantics.
+  if (manifest.capabilities !== undefined) {
+    if (!Array.isArray(manifest.capabilities)) {
+      error("capabilities 必须是数组");
+    } else {
+      for (const [index, capability] of manifest.capabilities.entries()) {
+        const at = `capabilities[${index}]`;
+        if (!isPlainObject(capability)) {
+          error(`${at} 必须是对象`);
+          continue;
+        }
+        const extra = Object.keys(capability).filter((key) => !["id", "label", "kind"].includes(key));
+        if (extra.length) error(`${at} 含未知字段: ${extra.join(", ")}`);
+        if (typeof capability.id !== "string" || capability.id.length < 1 || capability.id.length > 256 || !CAPABILITY_ID.test(capability.id)) {
+          error(`${at}.id 必须是 1–256 字符的小写 capability 标识符`);
+        }
+        if (typeof capability.label !== "string" || capability.label.length < 1) error(`${at}.label 必须是非空字符串`);
+        if (capability.kind !== undefined && typeof capability.kind !== "string") error(`${at}.kind 必须是字符串`);
+      }
+    }
   }
 
   // engines

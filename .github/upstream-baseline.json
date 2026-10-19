@@ -1,12 +1,13 @@
 {
-  "checkedAt": "2026-10-08T12:24:15.919Z",
+  "checkedAt": "2026-10-19T02:52:57.781Z",
   "sources": {
     "manifestSchema": {
       "url": "https://raw.githubusercontent.com/t8y2/dbx/main/plugins/manifest.schema.json",
-      "sha256": "22802c74884e8ad3fb870ba02174d964d7026d3a7bd5989ecde8455b7d38b908",
+      "sha256": "986277569eaf4293f2ac28162d8f860c6e2dbc2eda04431b008329779ceb79aa",
       "facts": {
         "topLevelFields": [
           "$schema",
+          "capabilities",
           "contributions",
           "description",
           "engines",
@@ -34,6 +35,8 @@
           "host.ai",
           "host.binary",
           "host.clipboard:read",
+          "host.connections::read",
+          "host.connections:read",
           "host.data:read",
           "host.events",
           "host.filesystem",

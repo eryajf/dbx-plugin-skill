@@ -142,7 +142,8 @@ node <skill-root>/scripts/dev-logs.mjs --port 5190 --level error --follow
 - 连接生命周期 `connection/test` / `connect` / `disconnect`，`success: false` 按真实宿主规则视为失败。
 - 工作台 Tab：按贡献点 + 可选连接 ID 建键，切换时保留 iframe，重复打开复用已有 Tab；关闭某个连接的最后一个 Tab 会在确认后断开连接。
 - 自定义 RPC 方法与结果原样转发（不解释业务含义）。
-- Host API 子集：`ready`、`contributionId`（ready 后可读）、`context`、`locale`、`theme`、`request`、`invoke`、`notify`、`onInit`、`onContext`、`onEvent`、`onBinary`、`sendBinary`、资源读取、`openWorkbench`。
+- Host API 子集：`ready`、`contributionId`（ready 后可读）、`context`、`locale`、`theme`、`request`、`invoke`、`notify`、`onInit`、`onContext`、`onEvent`、`onBinary`、`sendBinary`、资源读取、`openWorkbench`、`setTitle`/`getTitle`、`getConnections`/`connections.list`。
+- 当前 dev host 与正式宿主对齐的单个 UI 入口/资源上限为 32 MiB；超过上限会被拒绝，目录与符号链接隔离规则仍然生效。
 - 后端传输：默认 `stdio-jsonl` 与显式 `stdio-framed`，协议 v1；初始化会校验插件身份与版本。二进制通道需要 framed。
 - 权限强制执行：event、binary、workbench 导航权限会被检查。
 - 图标：workbench 条目/Tab/连接行使用贡献点 `icon`，回退到插件级 `icon`；图标路径相对**插件项目根**（不是 UI root），拒绝远程 URL 与越界路径；缺失时用宿主通用图标。

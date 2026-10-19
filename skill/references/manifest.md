@@ -24,6 +24,7 @@
 | `engines` | **是** | 至少含 `host_api`，见 §2 |
 | `permissions` | 否 | 见 §2 |
 | `entrypoints` | 否 | 有贡献点/后端时按需声明，见 §3 |
+| `capabilities` | 否 | 顶层 capability 元数据列表，见下文 |
 | `contributions` | 否 | 见 `contributions.md`；当前类型包括 `connection-provider`、`workbench`、`filesystem-provider`、`context-menu`、`result-view`、`command`、`menus`、`mcp` |
 | `localizations` | 否 | 见 §5 |
 
@@ -45,19 +46,21 @@
     "host.ai",
     "host.clipboard:read",
     "host.data:read",
+    "host.connections:read",
     "host.network:https://s3.example.com:443"
   ]
 }
 ```
 
 - `engines.host_api` 必需（`minLength: 1`，推荐 `"1"` 或 `"^1.0"`）；依赖估算执行计划 API 的插件应声明 `"^1.2"`，并仍在运行时检查 `capabilities.planApi`；`engines.dbx` 可选，是产品版本范围（模板默认 `>=0.5.68`）。
-- 固定权限枚举：`host.events`、`host.binary`、`host.workbench`、`host.filesystem`、`host.plans:read`、`host.schema:read`、`host.storage`、`host.ai`、`host.clipboard:read`、`host.data:read`。
+- 固定权限枚举：`host.events`、`host.binary`、`host.workbench`、`host.filesystem`、`host.plans:read`、`host.schema:read`、`host.storage`、`host.ai`、`host.clipboard:read`、`host.data:read`、`host.connections:read`。上游 Schema 还接受历史拼写 `host.connections::read`，新插件应使用单冒号形式。
 - `host.plans:read` 只允许读取宿主生成的**估算执行计划**，不允许执行 SQL、写入、DDL/DML 或实际计划；调用前检查初始化能力中的 `planApi`。
 - `host.storage` 只允许使用工作台专属的小型 JSON 状态存储；单个值上限 256 KiB、每个插件总量上限 1 MiB，不能借此访问任意文件。调用前检查初始化能力中的 `storage`。
 - `host.ai` 允许工作台把插件提供的数据快照交给 DBX 内置 AI 面板创建对话，也可在宿主确认后请求受控的纯文本生成；对话 API 不返回模型输出，文本生成 API 只返回纯文本，不开放工具、文件写入或凭据。调用前分别检查 `ai`、`aiModelDiscovery` 和 `aiCompletion`；旧版宿主可能拒绝未知权限，因此需要兼容旧宿主时应将其作为可选能力。
 - `host.schema:read` 只允许通过 `getTableMetadata` 读取已打开连接中单个 table 的窄化 schema metadata；不允许任意 SQL、写入、凭据读取或隐式重连。调用前检查初始化能力中的 `schemaMetadataApi`；依赖该能力的插件应声明 `engines.host_api: "^1.3"`。
 - `host.clipboard:read` 允许读取系统剪贴板；写入剪贴板无需权限。读取文本前检查 `capabilities.clipboardRead`，图片读取检查 `clipboardImageRead`；当前实现还增加会话首次确认和限频，详见 `host-api.md`。依赖该能力时声明 `engines.host_api: "^1.3"`。
 - `host.data:read` 允许在用户逐个授权的已打开连接上执行单条只读 SQL；不允许写入、DDL、锁定读、切换数据库或隐式重连。调用前检查 `capabilities.dataApi`，依赖该能力时声明 `engines.host_api: "^1.4"`。
+- `host.connections:read` 允许通过 `window.dbxPlugin.getConnections()` 或 `window.dbxPlugin.connections.list()` 读取所有已配置连接的脱敏摘要；不返回密码、用户名、主机、端口或连接串。调用前检查 `capabilities.connectionsApi`。兼容旧的插件范围查询时，宿主仍可在 `host.workbench` 下提供受限连接列表。
 - 网络权限 `host.network:https://<host>[:port]`：
   - **必须 HTTPS**；主机名只允许 `[A-Za-z0-9._-]`，端口可选数字；
   - **不允许路径、通配符、Token**；
@@ -65,6 +68,20 @@
   - 作用仅是把这些 origin 加入沙箱 CSP 的 `connect-src`，**仍受目标服务 CORS 约束**；
   - 它**不是** Sidecar 的防火墙 —— 原生后端不受此限制。
 - `permissions` 数组本身要求 `uniqueItems`。只声明真正用到的权限；reviewer 会逐一核对调用点。
+
+### 顶层 `capabilities`
+
+当前上游 Manifest Schema 接受可选的顶层数组：
+
+```json
+{
+  "capabilities": [
+    { "id": "vendor.preview", "label": "Preview support", "kind": "feature" }
+  ]
+}
+```
+
+每项必须是 `{ id, label, kind? }`，`id` 为 1–256 字符、匹配 `^[a-z0-9][a-z0-9._:-]*$`，`label` 非空，`kind`（若提供）为字符串。上游公开插件开发文档目前只定义了 Schema 形状，没有说明该列表会授予运行时权限或自动启用功能；不要把它当作 Host 权限或能力位，实际用途需要以后续官方说明为准。
 
 ## 3. `entrypoints`
 
