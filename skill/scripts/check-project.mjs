@@ -255,9 +255,8 @@ function checkManifest(dir, manifest) {
     );
   }
 
-  // Optional top-level capability declarations are schema metadata. The
-  // public runtime docs do not assign additional behavior to them yet, so
-  // validate only the published shape and do not infer security semantics.
+  // Validate the published metadata shape; Redis codecs additionally need a
+  // native backend to appear in the host selector (not a schema rejection).
   if (manifest.capabilities !== undefined) {
     if (!Array.isArray(manifest.capabilities)) {
       error("capabilities 必须是数组");
@@ -275,6 +274,9 @@ function checkManifest(dir, manifest) {
         }
         if (typeof capability.label !== "string" || capability.label.length < 1) error(`${at}.label 必须是非空字符串`);
         if (capability.kind !== undefined && typeof capability.kind !== "string") error(`${at}.kind 必须是字符串`);
+        if (capability.kind === "redis-value-codec-v1" && !isPlainObject(manifest.entrypoints?.backend)) {
+          warn(`${at}: redis-value-codec-v1 需要原生 entrypoints.backend，否则不会出现在 Redis 解码列表中`);
+        }
       }
     }
   }

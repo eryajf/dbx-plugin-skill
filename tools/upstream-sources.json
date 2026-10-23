@@ -25,7 +25,11 @@
       "apps/desktop/src/lib/plugins/pluginGraphicsEngine.ts",
       "apps/desktop/src/lib/plugins/pluginAiCompletion.ts",
       "src-tauri/src/plugin_ui_protocol.rs",
-      "src-tauri/src/commands/plugin_media.rs"
+      "src-tauri/src/commands/plugin_media.rs",
+      "apps/desktop/src/lib/redis/redisPluginCodec.ts",
+      "apps/desktop/src/components/redis/RedisPluginCodecView.vue",
+      "apps/desktop/src/components/redis/RedisPluginCodecView.spec.ts",
+      "apps/desktop/src/lib/__tests__/redis/redisPluginCodec.spec.ts"
     ]
   },
   "dbx-store": {

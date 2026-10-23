@@ -212,3 +212,9 @@ node <skill-root>/scripts/dev-logs.mjs --port 5190 --level error --follow
 | 改了 UI 不刷新 | 见 §2 `DBX_UI_BUILD_SUCCESS` |
 | 改了后端代码没重启 | 确认改的是 `[backend].directory` 内的 `.rs`/`.go`/module 文件；构建失败会让后端保持停止 |
 | Sidecar 启动即退出 | 后端把日志写到了 stdout；日志必须走 stderr |
+
+## Redis codec 与有状态 MCP 验收
+
+Redis Plugin 解码选择器需要真实 DBX，dev host 不模拟该 Redis 详情入口。验证无 backend/不兼容插件不会列出、仅显式选择后传值、切换载荷丢弃过时响应、失败清空结果、2 MiB 输入/序列化结果限制与 10 秒超时；协议见 `sidecar-protocol.md` §15。
+
+有状态 MCP 工具应测试“仅发现不启动监听器/数据库连接”、只读策略或注入开关关闭时拒绝操作，以及保存配置变化后的会话协调/停止重启。事务故障测试分别检查数据提交与锁清理，不要把 COMMIT 后断连判为回滚。

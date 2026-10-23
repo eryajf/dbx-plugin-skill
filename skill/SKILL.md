@@ -1,6 +1,6 @@
 ---
 name: dbx-plugin
-description: DBX 插件开发全流程。Use when 创建、开发、调试、打包、签名、发布或上架 DBX 插件；处理 manifest.json、dbx-plugin.toml、.dbxp 包、贡献点（connection-provider / proxy_route / workbench / filesystem-provider / context-menu / result-view / command / menus / mcp）、Host API（window.dbxPlugin 桥接）、Rust/Go Sidecar 协议、dbx-plugin CLI（create / dev / package / keygen）、dbx-store 候选 PR 与 catalog 校验时使用。
+description: DBX 插件开发全流程。Use when 创建、开发、调试、打包、签名、发布或上架 DBX 插件；处理 manifest.json、dbx-plugin.toml、.dbxp 包、贡献点（connection-provider / proxy_route / workbench / filesystem-provider / context-menu / result-view / command / menus / mcp）、Host API（window.dbxPlugin 桥接）、Redis 值解码器（redis-value-codec-v1）、Rust/Go Sidecar 协议、dbx-plugin CLI（create / dev / package / keygen）、dbx-store 候选 PR 与 catalog 校验时使用。
 ---
 
 # DBX 插件开发
@@ -69,7 +69,7 @@ SDK **不需要启动**：没有常驻 SDK Server。开发时只用三类工具�
 | 写/改 `manifest.json`、权限、入口、`localizations` | `references/manifest.md` |
 | 加连接表单、工作台、文件系统、右键菜单、结果视图、命令、菜单和 MCP 工具面 | `references/contributions.md` |
 | 写沙箱 UI、浮动窗口、贡献点路由、AI/媒体流、主题/CSP/全屏 | `references/host-api.md` |
-| 写 Rust/Go Sidecar、连接生命周期、二进制帧 | `references/sidecar-protocol.md` |
+| 写 Rust/Go Sidecar、连接生命周期、有状态 MCP 工具、Redis 值解码器、二进制帧 | `references/sidecar-protocol.md` |
 | 用 `dbx-plugin` 命令、装 CLI、模板选择 | `references/cli.md` |
 | 起 dev host 调试、看日志、诊断接口 | `references/debugging.md` |
 | 打包、`dbx-plugin.toml`、target、包体积限制 | `references/packaging.md` |
@@ -114,6 +114,9 @@ dbx-plugin create my-plugin \
 - 连接表单可用 `visible_when` / `required_when` 的 `all_of`、`any_of`、`not` 组合条件，以及 `picker` 提供本地文件选择；依赖这些能力时设置足够新的 `engines.dbx`。
 - 若握手可能超过通用超时，连接表单可声明 `config` 字段 `connect_timeout_secs`；DBX 会用其解析值作为 `connection/test` 与 `connection/connect` 的 deadline。需要访问 Kafka `advertised.listeners` 或集群发现等多端点协议时，在 connection-provider 上声明 `proxy_route: true`，通过生命周期请求的 `runtime.proxy` SOCKS5 路由连接广播端点。Sidecar 进程按插件共享、跨标签页复用，后端会话应按 `connection.id` 管理。
 - 工作台可声明 `ai.recommendations`，`command` 和 `menus` 可把同插件工作台放入命令面板、应用工具栏或侧边栏；Workbench UI 可用 `executeCommand` 复用这些命令，`instance_key` 可按连接隔离 panel，dock command 可用 `options_action` 从 Sidecar 获取启动选项；动态 `context-menu` 可生成一层原生子菜单。`mcp` 可声明 Sidecar 的 MCP 工具是否进入内置 AI 或外部 `dbx` MCP 服务。这些入口必须引用已声明的贡献点，并按运行时 capability 与用户开关做降级。
+
+- Redis 值解码器通过顶层 `capabilities[].kind: "redis-value-codec-v1"` 声明，并由原生 Sidecar 实现 `redis/codec/decode`；它不是新增 contribution 或 Host 权限。用户显式选择后才传值，输入/结果各限 2 MiB、10 秒超时、只读不回写，详见 `references/sidecar-protocol.md`。
+- 有状态 MCP 工具的 `mcp/tools` 只做发现；start/stop 必须为显式修改型调用。`mcp/call` 执行时检查绑定连接与策略，不能把隐藏工具或只读标注当作授权；可能已提交的事务结果应报告 `unknown`，不要自动重试。
 
 ### 步骤 3：本地调试
 
@@ -164,7 +167,7 @@ dbx-plugin package .
 ## 3. 硬性约束（违反必然失败）
 
 **Manifest**
-- `manifest.json` 必须在包根目录；Manifest v1 **拒绝任何未声明字段**（顶层白名单只有 `$schema`、`manifest_version`、`id`、`name`、`icon`、`version`、`publisher`、`description`、`source`、`homepage`、`engines`、`permissions`、`entrypoints`、`contributions`、`localizations`）。
+- `manifest.json` 必须在包根目录；Manifest v1 **拒绝任何未声明字段**（顶层白名单只有 `$schema`、`manifest_version`、`id`、`name`、`icon`、`version`、`publisher`、`description`、`source`、`homepage`、`engines`、`permissions`、`entrypoints`、`capabilities`、`contributions`、`localizations`）。
 - `id` 只能小写字母/数字/`.`/`_`/`-`，首字符为字母或数字；发布后不可更改。`version` 必须是合法 SemVer。
 - 包内路径相对包根，**不能**以 `/` 开头、不能含 `..`、反斜杠或重复斜杠。
 - `entrypoints.ui.entry` 必须位于 `ui.root` 内。

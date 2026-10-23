@@ -319,6 +319,15 @@ const goodManifest = makeProject({ dir: goodDir });
   writeFileSync(join(goodDir, "manifest.json"), `${JSON.stringify(goodManifest, null, 2)}\n`);
 }
 
+{
+  const codecManifest = { ...goodManifest, capabilities: [{ id: "custom", label: "Custom", kind: "redis-value-codec-v1" }] };
+  writeFileSync(join(goodDir, "manifest.json"), `${JSON.stringify(codecManifest, null, 2)}\n`);
+  const result = run([join(scripts, "check-project.mjs"), goodDir, "--json"]);
+  const parsed = JSON.parse(result.stdout);
+  check("无 backend 的 Redis codec 保持 Schema 合法但提示不可发现", result.status === 0 && parsed.findings.some((f) => f.message.includes("redis-value-codec-v1") && f.message.includes("entrypoints.backend")), result.stdout);
+  writeFileSync(join(goodDir, "manifest.json"), `${JSON.stringify(goodManifest, null, 2)}\n`);
+}
+
 const mcpDir = join(work, "mcp");
 mkdirSync(join(mcpDir, "bin", "darwin-arm64"), { recursive: true });
 mkdirSync(join(mcpDir, "backend"), { recursive: true });
@@ -353,6 +362,15 @@ writeFileSync(join(mcpDir, "dbx-plugin.toml"), `schema_version = 1\n\n[package]\
   check("命令支持按上下文复用和 options_action", parsed.ok === true);
   check("动态 context-menu 通过预检", parsed.ok === true);
 }
+{
+  const codecManifest = { ...mcpManifest, capabilities: [{ id: "custom", label: "Custom", kind: "redis-value-codec-v1" }] };
+  writeFileSync(join(mcpDir, "manifest.json"), `${JSON.stringify(codecManifest, null, 2)}\n`);
+  const result = run([join(scripts, "check-project.mjs"), mcpDir, "--json"]);
+  const parsed = JSON.parse(result.stdout);
+  check("原生 Redis codec 通过且不提示缺少 backend", result.status === 0 && !parsed.findings.some((f) => f.message.includes("redis-value-codec-v1")), result.stdout);
+  writeFileSync(join(mcpDir, "manifest.json"), `${JSON.stringify(mcpManifest, null, 2)}\n`);
+}
+
 {
   const invalidMcp = { ...mcpManifest, contributions: [...mcpManifest.contributions, { type: "mcp", id: "com.example.demo.mcp2", ai_tools: "yes" }] };
   writeFileSync(join(mcpDir, "manifest.json"), `${JSON.stringify(invalidMcp, null, 2)}\n`);

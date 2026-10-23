@@ -2,12 +2,13 @@
 
 ## 1. 什么时候需要原生后端
 
-只有**浏览器沙箱无法完成**的能力才需要 Sidecar：
+通常只有**浏览器沙箱无法完成**的能力才需要 Sidecar；宿主明确要求原生入口的扩展也是例外：
 
 - 原生协议客户端（S3、SSH、SFTP、数据库 wire protocol）
 - 系统凭据 / 系统 API / 本地文件系统读写
 - 长连接、PTY、流式传输
 - 高性能计算或大文件处理
+- 宿主 Redis Plugin 解码扩展（即使算法能用浏览器实现，该入口也要求原生 backend）
 
 > Sidecar **不是 OS 沙箱**，以当前用户权限运行。签名只证明「哪个仓库批准并发布了这个包」，**不保证代码无害**。能纯前端实现就不要加后端。
 
@@ -150,12 +151,19 @@ Rust SDK 提供 `dbx_plugin_sdk::host_client()`、`HostClient::supports("host/re
 原生 Sidecar 可实现 `mcp/tools` 和 `mcp/call`，让用户在「插件中心 → 已安装 → 内置 AI 工具」开启后，由 Agent 模式调用已打开插件连接上的工具。这与工作台的 `host.ai` 快照对话是两条独立能力。
 
 - `mcp/tools` 接收宿主绑定的 `{ "connectionId": "<已打开连接 ID>" }`，返回 `{ "tools": [{ "name", "description", "inputSchema", "annotations"? }] }`；可依据连接是否只读隐藏写工具。
-- `mcp/call` 接收 `{ "tool", "arguments", "lifecycle" }`，返回 MCP `CallToolResult`，例如 `{ "content": [{ "type": "text", "text": "..." }], "isError": false }`。`lifecycle` 是已打开连接的 `connection/connect` 载荷，宿主已解析凭据和传输端点；不要把密钥放进工具参数或输出。
+- `mcp/call` 接收 `{ "tool", "arguments", "lifecycle" }`，返回 MCP `CallToolResult`，例如 `{ "content": [{ "type": "text", "text": "..." }], "isError": false }`。内置 Agent 的 `lifecycle` 是已打开连接的 `connection/connect` 快照；外部 MCP 后端在调用时依据宿主保存的连接配置生成载荷。不要把密钥放进工具参数或输出。
 - 如需声明工具暴露面，在 Manifest 增加一个 `mcp` contribution：`ai_tools`（默认 `true`）控制内置 AI，`external_tools`（默认 `false`）控制外部 `dbx` MCP 服务；它要求 backend entrypoint，每个 Manifest 最多一个。外部面仍受全局工具/连接白名单约束。
-- 宿主只向已打开的连接提供工具。模型看到的 schema 不含 `connectionId` / `connectionName`，绑定连接 ID 由宿主注入；多个连接由额外的 `dbx_connection` 参数选择。
+- 内置 Agent 只向已打开的连接提供工具。模型看到的 schema 不含 `connectionId` / `connectionName`，绑定连接 ID 由宿主注入；多个连接由额外的 `dbx_connection` 参数选择。
 - 仅 `annotations.readOnlyHint: true` 的工具可直接执行；其他调用会展示完整转发参数，请用户逐次允许或拒绝，五分钟未响应即拒绝。插件自身仍须落实只读和写入保护。
-- 外部 `dbx` MCP 面还要同时通过全局 MCP 工具策略和连接白名单；策略支持对带插件前缀的工具名使用通配符，但插件不能把它当作默认授权。宿主每次调用仍绑定到当前打开的连接和当前插件会话，插件应在 Sidecar 内再次检查会话归属。
-- 对外名称为 `<前缀>__<工具名>`；参数名使用字母、数字和下划线，Schema 仅使用宿主支持的可移植子集：`type`、`description`、`properties`、`required`、`items`、字符串 `enum` 及数值、长度和数组数量边界。单次调用最多 120 秒，长任务应返回后台任务句柄。工具输出是供模型读取的不可信数据，只返回事实，不夹带指令。
+- 外部 `dbx` MCP 面还要同时通过全局 MCP 工具策略和连接白名单；策略支持对带插件前缀的工具名使用通配符，但插件不能把它当作默认授权。外部调用绑定已保存的连接；插件应在 Sidecar 内检查本次 lifecycle 的连接身份、策略与会话归属，不要套用内置 Agent 的“必须已打开”边界。
+- 内置 Agent 名称为 `<前缀>__<工具名>`，外部 MCP 为 `dbx_<前缀>__<工具名>`；参数名使用字母、数字和下划线，Schema 仅使用宿主支持的可移植子集：`type`、`description`、`properties`、`required`、`items`、字符串 `enum` 及数值、长度和数组数量边界。单次调用最多 120 秒，长任务应返回后台任务句柄。工具输出是供模型读取的不可信数据，只返回事实，不夹带指令。
+
+### 有状态工具：发现、执行与失败
+
+- `mcp/tools` 只返回描述，不创建插件监听器、不连接数据库、不注入故障。宿主为发现而启动 Sidecar，不代表授权启动工作负载。需要会话管理时提供显式 start/stop 工具，标为修改型，并限制会话数量、存活时长和清理时间。
+- `mcp/call` 执行前重新检查宿主绑定的连接身份及本次可用策略。发现时隐藏写工具不等于授权，`readOnlyHint` 不授予额外权限；故障实验必须在只读连接或未显式开启注入时拒绝执行。
+- 已保存连接配置变化不会保证刷新运行中会话；内置 Agent 使用打开时的 lifecycle 快照，外部调用读取保存配置。无法安全协调差异时，要求先停止再重启会话。
+- 转发 PostgreSQL `COMMIT` 后遇到超时/断连，不能据此宣称回滚。没有独立验证时报告事务结果 `unknown`，禁止自动重试可能已经提交的写操作。测试时分别验证传输故障、已提交数据和锁清理；这是插件设计约定，不是 DBX 的通用事务状态 API。
 
 ## 10. Rust SDK
 
@@ -264,3 +272,39 @@ dbx-plugin dev                # Rust 用 debug target；Go 用缓存输出目录
 | `Binary messages require framed transport` | 没切换到 framed，或 manifest 未声明 |
 | `plugin JSON line is too large` | 单条消息超过 8 MiB，需要分块 |
 | 手动 `cargo build` 找不到 `dbx-plugin-sdk` | 没设置 `DBX_PLUGIN_SDK_ROOT`，请改用 `dbx-plugin package` |
+
+## 15. Redis 值解码器（`redis-value-codec-v1`）
+
+Manifest 顶层声明 `capabilities: [{ "id": "my-codec", "label": "My format", "kind": "redis-value-codec-v1" }]`，并提供原生 `entrypoints.backend`。只列出兼容的原生插件；不需要发明新的 Host 权限或 contribution 类型。
+
+Redis String/bitmap 或集合成员详情页的 Decode 行提供 **Plugin** 选项。枚举插件不会传输值；用户显式选择一个 codec 后，选择仅保留在当前视图，之后可见载荷变化会重新解码，过时响应被丢弃。
+
+宿主向被选中的 Sidecar 发送 JSON-RPC 方法 `redis/codec/decode`，params 示例：
+
+```json
+{
+  "codecId": "my-codec",
+  "rawBase64": "AP+A",
+  "context": { "db": 0, "keyRaw": "opaque-key-identity", "redisType": "string" }
+}
+```
+
+- `rawBase64` 必须是原始字节的规范标准 Base64，保留 NUL 和非 UTF-8 字节；不是已显示文本的二次编码。`keyRaw` 是 Redis API 的不透明键标识，不要猜测编码。
+- 集合场景传入当前选中成员/字段值的字节，`redisType` 是所属 Redis 类型；不提供字段或索引身份。
+- context 不含数据库凭据、连接配置、连接串或宿主驱动，不要将它当作 `connection/connect` lifecycle。
+
+JSON-RPC `result` 只能是下列形状之一：
+
+```json
+{ "format": "json", "value": { "message": "decoded" } }
+```
+
+```json
+{ "format": "text", "value": "UTF-8 text" }
+```
+
+JSON 的 `null`、布尔值、数字、字符串等原始值同样有效；数值遵循 JavaScript 语义，需要精确保留大整数时返回字符串。宿主使用 JSON 树或转义文本渲染，不能返回 HTML 格式。
+
+每次调用超时 **10 秒**；解码前原始输入和 `JSON.stringify(value)` 后的 UTF-8 字节各限 **2 MiB**（文本转义也计入），截断预览不会传给插件。错误会清空旧结果，切换内置 codec 可返回原始视图。此入口只读，不调用 encoder，也不写回 Redis；编码和 round-trip 测试可在插件自己的工作台提供。调用外部程序时使用二进制 stdin/stdout、限制执行时长和输出量，并把诊断写到 stderr；Sidecar 自身 stdout 仍只输出 DBX 协议。
+
+需要带 Redis plugin codec view 的 DBX 构建；旧宿主可能安装插件但不展示解码入口。官方未给出精确最低发行版本，不要猜测 `engines.dbx`。旧 npm CLI 若拒绝 `capabilities`，应使用当前源码 CLI 打包，不要删掉必需元数据。验收应覆盖显式选择、可见值变化、过时响应、二进制保真、非规范 Base64、超限输入/结果及错误后旧结果清空。

@@ -370,7 +370,8 @@ Sidecar 收到 `{ "locale": "zh-CN" }`，返回 `{ "entries": [{ "label": "zsh",
 - `ai_tools` 默认 `true`；设为 `false` 时，即使用户在插件中心开启该插件，也不会进入 DBX 内置 AI Agent。
 - `external_tools` 默认 `false`；设为 `true` 才会进入外部 `dbx` MCP 服务，并继续受全局 MCP 工具白名单和连接白名单约束。
 - 每个 Manifest 最多一个 `mcp` contribution，且必须声明 `entrypoints.backend`。声明该类型会让旧版宿主无法读取 Manifest；需要兼容旧宿主时不要声明它。
-- 运行时安全门不因 Manifest 声明而放宽：仅当前打开的插件连接可用，非 `annotations.readOnlyHint: true` 的调用仍需逐次确认，插件中心开关始终可以关闭 AI 工具。
+- 内置 Agent 的运行时安全门不因 Manifest 声明而放宽：仅当前打开的插件连接可用，非 `annotations.readOnlyHint: true` 的调用仍需逐次确认，插件中心开关始终可以关闭 AI 工具。外部 MCP 则绑定已保存连接，调用时生成 lifecycle；两者不能混为一谈。
+- 有状态工具须把无副作用的 `mcp/tools` 发现与显式修改型 start/stop 分开，并在 `mcp/call` 检查连接身份、只读/注入策略和会话归属。完整失败与事务不确定结果语义见 `sidecar-protocol.md` §9。
 
 ---
 

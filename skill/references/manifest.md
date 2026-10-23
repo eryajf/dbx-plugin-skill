@@ -76,12 +76,12 @@
 ```json
 {
   "capabilities": [
-    { "id": "vendor.preview", "label": "Preview support", "kind": "feature" }
+    { "id": "my-codec", "label": "My format", "kind": "redis-value-codec-v1" }
   ]
 }
 ```
 
-每项必须是 `{ id, label, kind? }`，`id` 为 1–256 字符、匹配 `^[a-z0-9][a-z0-9._:-]*$`，`label` 非空，`kind`（若提供）为字符串。上游公开插件开发文档目前只定义了 Schema 形状，没有说明该列表会授予运行时权限或自动启用功能；不要把它当作 Host 权限或能力位，实际用途需要以后续官方说明为准。
+每项必须是 `{ id, label, kind? }`，`id` 为 1–256 字符、匹配 `^[a-z0-9][a-z0-9._:-]*$`，`label` 非空，`kind`（若提供）为字符串。`kind: "redis-value-codec-v1"` 已有明确用途：把兼容且带原生 backend entrypoint 的插件列入 Redis 详情页的 Plugin 解码选项；选择后调用 `redis/codec/decode`。没有 backend 的声明不会出现在该列表中，预检会给出警告。它不是新增 contribution 类型，也不授予 Host 权限；不要与 `window.dbxPlugin.capabilities` 或初始化握手的 capabilities 混淆。其它 kind 的语义不能自行推断。协议、尺寸和版本边界见 `sidecar-protocol.md` §15。
 
 ## 3. `entrypoints`
 
