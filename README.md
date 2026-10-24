@@ -239,7 +239,7 @@ npm run upstream:update
 
 ## 最近一次官方对齐
 
-2026-10-23 对齐至 DBX `0297c5ecf9d727b18e918175d1bcc2f8aa08f08f` 与 dbx-store `823f2a22e4645bace5dd63c8dbd91ac682ea1c01`。补充 Redis 值解码器协议、原生后端预检提示、有状态 MCP 工具生命周期和事务不确定结果处理，并修正外部 MCP 连接边界；Schema、CLI/SDK、打包与商店签名流程未变化。详见 [逐项对齐记录](docs/upstream-alignment-2026-10-23.md)。
+2026-10-24 对齐至 DBX `c6fb06c035bac863731999072b85f82e63083765` 与 dbx-store `06bd80d275fddf274c0a12b0f5e9c470c275e733`，发布 `0.1.20`。相较 10 月 23 日，选取的 DBX 插件文档与实现完全未变，Store 仅更新目录、插件和发布者数据；现有 Redis 值解码器、有状态 MCP、Host API、校验及签名规则继续适用，npm CLI 仍为 `0.1.9`。详见 [逐项对齐记录](docs/upstream-alignment-2026-10-24.md)；最近一轮能力新增见 [10 月 23 日记录](docs/upstream-alignment-2026-10-23.md)。
 
 ## 更新已安装的 skill
 

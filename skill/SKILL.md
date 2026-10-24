@@ -8,6 +8,8 @@ description: DBX 插件开发全流程。Use when 创建、开发、调试、打
 本 skill 覆盖 DBX 插件的**创建 → 开发 → 调试 → 打包 → 发布 → 官方商店上架**全链路。
 所有契约以 Manifest v1 + Host API 1.x + Sidecar Protocol v1 + `.dbxp` 包格式为准。
 
+最近核验：2026-10-24，DBX `c6fb06c035bac863731999072b85f82e63083765`、dbx-store `06bd80d275fddf274c0a12b0f5e9c470c275e733`。相较 2026-10-23，选取的 DBX 插件文档与实现未变，Store 仅目录与发布者数据更新；现有 Redis codec、有状态 MCP、Host API 和发布规则继续适用。源码能力不等于已发布 CLI 或目标宿主必然支持，仍需按 reference 中的能力探测与验收要求处理。
+
 ## 0. 先建立正确的心智模型（读之前必看）
 
 ### 0.1 四个契约各自管什么
