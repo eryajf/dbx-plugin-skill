@@ -229,7 +229,7 @@ if (window.dbxPlugin.capabilities.aiCompletion) {
 
 桌面宿主可通过 `window.dbxPlugin.fileTransfer` 将用户明确选择或拖入工作台的本地文件按分块提供给插件。使用 `pick`/`beginSave` 打开原生对话框，使用 `read` 逐块读取；拖放通过 `onDrop` 接收。拖入文件夹会展开为普通文件，并保留 `relativePath`，方便插件重建目录结构。句柄按需打开，选择数量超过共享句柄池时会降级为惰性条目，不会静默丢文件。
 
-`onDrop` 的监听器签名为 `(files, { dropId, truncated })`：`dropId` 用于整组文件的取消和进度记账，`truncated` 表示展开因 2000 个文件或 8 层深度上限被截断。点文件和点目录会跳过。能力探测使用 init 消息中的 additive `capabilities.fileTransfer` 标志（`pick`、`beginSave`、`read`、`drop`、`folderExpansion`），不要靠试调用。Web 宿主可把 `pick`/`beginSave` 降级到浏览器选择和下载，但 `drop` / `folderExpansion` 为 false，且句柄不含 `relativePath`；只在拖放落点位于本插件工作台区域内时触发 `onDrop`。
+`onDrop` 的监听器签名为 `(files, { dropId, truncated, position })`：`dropId` 用于整组文件的取消和进度记账，`truncated` 表示展开因 2000 个文件或 8 层深度上限被截断，`position` 是 drop 落点相对于 iframe 视口的 CSS 坐标 `{ x, y }`。`onDragState` 的签名为 `(active, position)`，可用坐标驱动工作台内的悬停目标；拖出或结束时 `position` 为 `undefined`。点文件和点目录会跳过。能力探测使用 init 消息中的 additive `capabilities.fileTransfer` 标志（`pick`、`beginSave`、`read`、`drop`、`folderExpansion`），不要靠试调用。Web 宿主可把 `pick`/`beginSave` 降级到浏览器选择和下载，但 `drop` / `folderExpansion` 为 false，且句柄不含 `relativePath`；只在拖放落点位于本插件工作台区域内时触发 `onDrop`。
 
 ```js
 const transfer = window.dbxPlugin.fileTransfer;
@@ -237,7 +237,7 @@ if (transfer && window.dbxPlugin.capabilities.fileTransfer?.drop) {
   const off = transfer.onDrop((files, meta) => {
     for (const file of files) {
       // file.relativePath 可为 folder/nested/file.csv
-      uploadFile(file.handleId, file.relativePath ?? file.name, meta.dropId);
+      uploadFile(file.handleId, file.relativePath ?? file.name, meta.dropId, meta.position);
     }
     if (meta.truncated) showWarning("文件夹内容已截断，请分批拖放");
   });

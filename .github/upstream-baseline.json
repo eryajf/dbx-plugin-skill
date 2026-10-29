@@ -1,9 +1,9 @@
 {
-  "checkedAt": "2026-10-19T02:52:57.781Z",
+  "checkedAt": "2026-10-29T09:40:08.839Z",
   "sources": {
     "manifestSchema": {
       "url": "https://raw.githubusercontent.com/t8y2/dbx/main/plugins/manifest.schema.json",
-      "sha256": "986277569eaf4293f2ac28162d8f860c6e2dbc2eda04431b008329779ceb79aa",
+      "sha256": "953f9cde41256b269f95b28546abda3dc7aae2e6699c5e3bd62d3a7b3cc04945",
       "facts": {
         "topLevelFields": [
           "$schema",

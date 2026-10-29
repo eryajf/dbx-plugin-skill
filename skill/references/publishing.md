@@ -45,6 +45,8 @@
 }
 ```
 
+当 Manifest 声明 `mcp` contribution 时，签名 Workflow 生成的 Marketplace catalog 条目可设置 `mcpTools: true`，让 Marketplace 在安装前显示 MCP 工具标记并支持筛选。该字段属于 DBX Marketplace catalog，不属于 `.dbx-store.json` 或候选文件；候选 Schema 与 Store 校验规则本轮未改变。
+
 - **允许字段恰好是这 10 个**：`name`、`description`、`icon`、`tags`、`permissions`、`source`、`homepage`、`license`、`releaseNotes`、`localizations`。多任何键 → `Unsupported store metadata field '<k>'`。
 - **首次上架必需**：`name` 和 `license`（否则 `New plugins require store metadata 'name'` / `'license'`）。
 - `icon` 写相对路径时会被自动转成该 tag 下的 `raw.githubusercontent.com` HTTPS 地址；写绝对 URL 则原样使用。**必须是 `.svg` 或 `.png`**。

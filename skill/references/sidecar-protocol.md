@@ -152,10 +152,12 @@ Rust SDK 提供 `dbx_plugin_sdk::host_client()`、`HostClient::supports("host/re
 
 - `mcp/tools` 接收宿主绑定的 `{ "connectionId": "<已打开连接 ID>" }`，返回 `{ "tools": [{ "name", "description", "inputSchema", "annotations"? }] }`；可依据连接是否只读隐藏写工具。
 - `mcp/call` 接收 `{ "tool", "arguments", "lifecycle" }`，返回 MCP `CallToolResult`，例如 `{ "content": [{ "type": "text", "text": "..." }], "isError": false }`。内置 Agent 的 `lifecycle` 是已打开连接的 `connection/connect` 快照；外部 MCP 后端在调用时依据宿主保存的连接配置生成载荷。不要把密钥放进工具参数或输出。
-- 如需声明工具暴露面，在 Manifest 增加一个 `mcp` contribution：`ai_tools`（默认 `true`）控制内置 AI，`external_tools`（默认 `false`）控制外部 `dbx` MCP 服务；它要求 backend entrypoint，每个 Manifest 最多一个。外部面仍受全局工具/连接白名单约束。
+- 如需声明工具暴露面，在 Manifest 增加一个 `mcp` contribution：`ai_tools`（默认 `true`）控制内置 AI，`external_tools`（默认 `false`）控制外部 `dbx` MCP 服务；它要求 backend entrypoint，每个 Manifest 最多一个。外部面还可声明 `toolsets`（设置界面分组）、`tools`（最多 64 个工具的 `read` / `write` / `full` 访问级别）和一个 `scope`（连接下的 namespace、目录等子范围）。外部面仍受全局工具/连接白名单约束。
 - 内置 Agent 只向已打开的连接提供工具。模型看到的 schema 不含 `connectionId` / `connectionName`，绑定连接 ID 由宿主注入；多个连接由额外的 `dbx_connection` 参数选择。
 - 仅 `annotations.readOnlyHint: true` 的工具可直接执行；其他调用会展示完整转发参数，请用户逐次允许或拒绝，五分钟未响应即拒绝。插件自身仍须落实只读和写入保护。
 - 外部 `dbx` MCP 面还要同时通过全局 MCP 工具策略和连接白名单；策略支持对带插件前缀的工具名使用通配符，但插件不能把它当作默认授权。外部调用绑定已保存的连接；插件应在 Sidecar 内检查本次 lifecycle 的连接身份、策略与会话归属，不要套用内置 Agent 的“必须已打开”边界。
+- 启用 `external_tools` 时，只有在 Manifest `tools` 中声明且带 `access` 的 `mcp/tools` 返回项才会暴露；未声明项不会因 MCP annotation 自动暴露，宿主会按声明级别重写 `readOnlyHint` / `destructiveHint`。工具可引用 `toolsets` 分组；`scope` 的 `argument` 会在每次外部调用中检查，缺少必要范围时返回 `SCOPE_REQUIRED`。不要把 `*`、空值或父路径解释成更宽范围。
+- 外部工具还受插件授权、访问上限、逐工具开关与调用安全策略约束；`access: "full"` 可要求用户确认，新工具或访问级别提升必须重新获得授权。插件声明 `mcp` 后，商店目录条目应设置 `mcpTools: true`，让安装前的 MCP 标记可见。
 - 内置 Agent 名称为 `<前缀>__<工具名>`，外部 MCP 为 `dbx_<前缀>__<工具名>`；参数名使用字母、数字和下划线，Schema 仅使用宿主支持的可移植子集：`type`、`description`、`properties`、`required`、`items`、字符串 `enum` 及数值、长度和数组数量边界。单次调用最多 120 秒，长任务应返回后台任务句柄。工具输出是供模型读取的不可信数据，只返回事实，不夹带指令。
 
 ### 有状态工具：发现、执行与失败

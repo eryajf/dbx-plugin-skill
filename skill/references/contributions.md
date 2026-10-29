@@ -362,13 +362,28 @@ Sidecar 收到 `{ "locale": "zh-CN" }`，返回 `{ "entries": [{ "label": "zsh",
   "id": "vendor.ssh.mcp",
   "description": "Terminal and file tools over SSH connections.",
   "ai_tools": true,
-  "external_tools": true
+  "external_tools": true,
+  "toolsets": [
+    { "id": "files", "title": "Files" },
+    { "id": "shell", "title": "Remote shell", "description": "Run commands on the host" }
+  ],
+  "scope": { "kind": "namespace", "title": "Namespace", "argument": "namespace", "list_method": "mcp/scopes" },
+  "tools": {
+    "sftp_list_dir": { "toolset": "files", "access": "read" },
+    "sftp_upload": { "toolset": "files", "access": "write" },
+    "ssh_exec": { "toolset": "shell", "access": "full" }
+  }
 }
 ```
 
 - 只要求 `type` 和 `id`；`description` 可选。
 - `ai_tools` 默认 `true`；设为 `false` 时，即使用户在插件中心开启该插件，也不会进入 DBX 内置 AI Agent。
 - `external_tools` 默认 `false`；设为 `true` 才会进入外部 `dbx` MCP 服务，并继续受全局 MCP 工具白名单和连接白名单约束。
+- `toolsets` 可按设置界面分组工具；每项必须有唯一的 `id`（`[a-z0-9._-]`，最长 64）和非空 `title`。
+- `tools` 最多声明 64 个工具名；每个工具可指定 `toolset` 和 `access`（`read`、`write`、`full`）。启用 `external_tools` 时，只有这里声明且带访问级别的 `mcp/tools` 返回项才会暴露；未声明项不会因 MCP annotation 自动暴露，宿主会按声明级别重写读写/破坏性提示。
+- `scope` 可为每个连接声明一个子范围（如 namespace 或目录），字段为 `kind`、`title`、`argument`，可选 `list_method` 返回 `{ values: [string] }`。外部调用会在绑定连接上检查该参数；缺少必需范围时返回 `SCOPE_REQUIRED`。Sidecar 必须拒绝把 `*`、空值或父路径解释成更宽范围。
+- 外部工具在设置中还受插件授权、访问上限、逐工具开关和调用安全策略约束；`access: "full"` 可要求用户确认。新工具或访问级别提升不会在插件更新后静默放开。
+- Store catalog 条目应在 Manifest 声明 `mcp` 时设置 `mcpTools: true`，以便安装前显示 MCP 工具标记。
 - 每个 Manifest 最多一个 `mcp` contribution，且必须声明 `entrypoints.backend`。声明该类型会让旧版宿主无法读取 Manifest；需要兼容旧宿主时不要声明它。
 - 内置 Agent 的运行时安全门不因 Manifest 声明而放宽：仅当前打开的插件连接可用，非 `annotations.readOnlyHint: true` 的调用仍需逐次确认，插件中心开关始终可以关闭 AI 工具。外部 MCP 则绑定已保存连接，调用时生成 lifecycle；两者不能混为一谈。
 - 有状态工具须把无副作用的 `mcp/tools` 发现与显式修改型 start/stop 分开，并在 `mcp/call` 检查连接身份、只读/注入策略和会话归属。完整失败与事务不确定结果语义见 `sidecar-protocol.md` §9。

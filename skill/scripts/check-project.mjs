@@ -494,7 +494,7 @@ function checkContributions(manifest, dir) {
             : type === "menus"
               ? ["type", "id", "items"]
               : type === "mcp"
-                ? ["type", "id", "description", "ai_tools", "external_tools"]
+                ? ["type", "id", "description", "ai_tools", "external_tools", "toolsets", "scope", "tools"]
               : ["type", "id", "label", "description", "icon"];
       const extra = Object.keys(contribution).filter(
         (k) => !allowed.includes(k),
@@ -547,6 +547,66 @@ function checkContributions(manifest, dir) {
         if (!hasManifestBackend) error(`${at}: mcp contribution 要求 entrypoints.backend`);
         if (contribution.ai_tools !== undefined && typeof contribution.ai_tools !== "boolean") error(`${at}.ai_tools 必须是布尔值`);
         if (contribution.external_tools !== undefined && typeof contribution.external_tools !== "boolean") error(`${at}.external_tools 必须是布尔值`);
+        if (contribution.toolsets !== undefined) {
+          if (!Array.isArray(contribution.toolsets)) {
+            error(`${at}.toolsets 必须是数组`);
+          } else {
+            const toolsetIds = new Set();
+            contribution.toolsets.forEach((toolset, toolsetIndex) => {
+              const toolsetAt = `${at}.toolsets[${toolsetIndex}]`;
+              if (!isPlainObject(toolset)) {
+                error(`${toolsetAt} 必须是对象`);
+                return;
+              }
+              const keys = Object.keys(toolset);
+              const extra = keys.filter((key) => !["id", "title", "description"].includes(key));
+              if (extra.length) error(`${toolsetAt} 含未知字段: ${extra.join(", ")}`);
+              if (typeof toolset.id !== "string" || !/^[a-z0-9][a-z0-9._-]*$/.test(toolset.id) || toolset.id.length > 64) {
+                error(`${toolsetAt}.id 必须匹配 [a-z0-9][a-z0-9._-]* 且长度不超过 64`);
+              } else if (toolsetIds.has(toolset.id)) {
+                error(`${at}.toolsets 的 id 重复: ${toolset.id}`);
+              } else toolsetIds.add(toolset.id);
+              if (typeof toolset.title !== "string" || toolset.title.length === 0) error(`${toolsetAt}.title 必须是非空字符串`);
+              if (toolset.description !== undefined && (typeof toolset.description !== "string" || toolset.description.length === 0)) error(`${toolsetAt}.description 必须是非空字符串`);
+            });
+          }
+        }
+        if (contribution.scope !== undefined) {
+          const scope = contribution.scope;
+          if (!isPlainObject(scope)) {
+            error(`${at}.scope 必须是对象`);
+          } else {
+            const extra = Object.keys(scope).filter((key) => !["kind", "title", "argument", "list_method"].includes(key));
+            if (extra.length) error(`${at}.scope 含未知字段: ${extra.join(", ")}`);
+            if (typeof scope.kind !== "string" || !/^[a-z0-9][a-z0-9._-]*$/.test(scope.kind) || scope.kind.length > 64 || scope.kind === "database") error(`${at}.scope.kind 非法（不能是 database）`);
+            if (typeof scope.title !== "string" || scope.title.length === 0) error(`${at}.scope.title 必须是非空字符串`);
+            if (typeof scope.argument !== "string" || scope.argument.length === 0 || scope.argument.length > 64) error(`${at}.scope.argument 必须是 1–64 个字符的非空字符串`);
+            if (scope.list_method !== undefined && (typeof scope.list_method !== "string" || scope.list_method.length === 0)) error(`${at}.scope.list_method 必须是非空字符串`);
+          }
+        }
+        if (contribution.tools !== undefined) {
+          if (!isPlainObject(contribution.tools)) {
+            error(`${at}.tools 必须是对象`);
+          } else {
+            const entries = Object.entries(contribution.tools);
+            if (entries.length > 64) error(`${at}.tools 最多声明 64 个工具`);
+            const toolsetIds = new Set(Array.isArray(contribution.toolsets) ? contribution.toolsets.filter(isPlainObject).map((toolset) => toolset.id) : []);
+            for (const [toolName, declaration] of entries) {
+              const toolAt = `${at}.tools[${JSON.stringify(toolName)}]`;
+              if (!isPlainObject(declaration)) {
+                error(`${toolAt} 必须是对象`);
+                continue;
+              }
+              const extra = Object.keys(declaration).filter((key) => !["toolset", "access"].includes(key));
+              if (extra.length) error(`${toolAt} 含未知字段: ${extra.join(", ")}`);
+              if (declaration.toolset !== undefined && (typeof declaration.toolset !== "string" || !toolsetIds.has(declaration.toolset))) error(`${toolAt}.toolset 必须引用已声明的 toolsets.id`);
+              if (declaration.access !== undefined && !["read", "write", "full"].includes(declaration.access)) error(`${toolAt}.access 必须是 read、write 或 full`);
+              if (contribution.external_tools === true && declaration.access === undefined) warn(`${toolAt} 未声明 access；external_tools 面不会暴露未声明访问级别的工具`);
+            }
+          }
+        } else if (contribution.external_tools === true) {
+          warn(`${at}.external_tools=true 但未声明 tools；外部 MCP 面不会暴露任何工具`);
+        }
         break;
       default:
         break;

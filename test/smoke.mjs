@@ -348,7 +348,17 @@ mcpManifest.contributions.push(
     },
   },
   { type: "context-menu", id: "com.example.demo.dynamic", label: "Dynamic", menu: "connection", dynamic: true },
-  { type: "mcp", id: "com.example.demo.mcp", external_tools: true },
+  {
+    type: "mcp",
+    id: "com.example.demo.mcp",
+    external_tools: true,
+    toolsets: [{ id: "files", title: "Files" }],
+    scope: { kind: "namespace", title: "Namespace", argument: "namespace", list_method: "mcp/scopes" },
+    tools: {
+      list: { toolset: "files", access: "read" },
+      exec: { access: "full" },
+    },
+  },
 );
 writeFileSync(join(mcpDir, "manifest.json"), `${JSON.stringify(mcpManifest, null, 2)}\n`);
 writeFileSync(join(mcpDir, "bin", "darwin-arm64", "backend"), "#!/bin/sh\n");
@@ -361,6 +371,21 @@ writeFileSync(join(mcpDir, "dbx-plugin.toml"), `schema_version = 1\n\n[package]\
   check("mcp contribution 不要求 label", parsed.ok === true);
   check("命令支持按上下文复用和 options_action", parsed.ok === true);
   check("动态 context-menu 通过预检", parsed.ok === true);
+  check("mcp 外部工具授权声明通过预检", parsed.ok === true);
+}
+
+{
+  const invalidAccess = {
+    ...mcpManifest,
+    contributions: mcpManifest.contributions.map((item) => item.type === "mcp"
+      ? { ...item, tools: { list: { access: "admin" } } }
+      : item),
+  };
+  writeFileSync(join(mcpDir, "manifest.json"), `${JSON.stringify(invalidAccess, null, 2)}\n`);
+  const result = run([join(scripts, "check-project.mjs"), mcpDir, "--json"]);
+  const parsed = JSON.parse(result.stdout);
+  check("非法 mcp 工具访问级别被拒绝", result.status === 1 && parsed.findings.some((f) => f.message.includes("access 必须是 read、write 或 full")), result.stdout);
+  writeFileSync(join(mcpDir, "manifest.json"), `${JSON.stringify(mcpManifest, null, 2)}\n`);
 }
 {
   const codecManifest = { ...mcpManifest, capabilities: [{ id: "custom", label: "Custom", kind: "redis-value-codec-v1" }] };
